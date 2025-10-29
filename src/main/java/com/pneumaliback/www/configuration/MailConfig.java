@@ -1,6 +1,7 @@
 package com.pneumaliback.www.configuration;
 
 import com.pneumaliback.www.service.mail.EmailSender;
+import com.pneumaliback.www.service.mail.LogOnlyEmailSender;
 import com.pneumaliback.www.service.mail.SendGridEmailSender;
 import com.pneumaliback.www.service.mail.SmtpEmailSender;
 import com.sendgrid.SendGrid;
@@ -16,13 +17,15 @@ import java.util.Properties;
 /**
  * Configuration intelligente du service email avec Pattern Strategy
  * 
- * Deux implémentations disponibles :
+ * Trois implémentations disponibles :
  * 1. SMTP classique (développement local, serveurs avec ports SMTP ouverts)
  * 2. SendGrid API HTTP (Render, Heroku, et autres clouds bloquant SMTP)
+ * 3. LogOnly (développement sans email - log dans la console)
  * 
  * Configuration via propriétés :
  * - app.mail.provider=smtp → Utilise SMTP classique
  * - app.mail.provider=sendgrid → Utilise SendGrid (recommandé pour Render)
+ * - app.mail.provider=logonly → Log uniquement (mode dev)
  */
 @Configuration
 @Slf4j
@@ -32,13 +35,33 @@ public class MailConfig {
     private String fromAddress;
 
     /**
+     * Bean EmailSender pour mode développement sans email
+     * Activé quand app.mail.provider=logonly
+     * Log les codes dans la console au lieu d'envoyer des emails
+     */
+    @Bean
+    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "logonly")
+    public EmailSender logOnlyEmailSender() {
+        log.warn("⚠️  Configuration email : LogOnly (Mode Développement)");
+        log.warn("⚠️  Les emails seront affichés dans les logs au lieu d'être envoyés");
+        return new LogOnlyEmailSender();
+    }
+
+    /**
      * Bean EmailSender pour SendGrid (API HTTP)
      * Activé quand app.mail.provider=sendgrid
+     * Avec fallback vers LogOnly si la clé API est manquante
      */
     @Bean
     @ConditionalOnProperty(name = "app.mail.provider", havingValue = "sendgrid")
     public EmailSender sendGridEmailSender(
-            @Value("${app.mail.sendgrid.api-key}") String apiKey) {
+            @Value("${app.mail.sendgrid.api-key:}") String apiKey) {
+
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            log.error("❌ SENDGRID_API_KEY non configuré ! Utilisation du mode LogOnly comme fallback");
+            log.error("⚠️  Configurez SENDGRID_API_KEY dans Render ou utilisez app.mail.provider=logonly");
+            return new LogOnlyEmailSender();
+        }
 
         SendGrid sendGridClient = new SendGrid(apiKey);
         log.info("✅ Configuration email : SendGrid (API HTTP)");
@@ -47,10 +70,10 @@ public class MailConfig {
 
     /**
      * Bean EmailSender pour SMTP classique
-     * Activé quand app.mail.provider=smtp (défaut)
+     * Activé quand app.mail.provider=smtp
      */
     @Bean
-    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "smtp", matchIfMissing = true)
+    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "smtp")
     public EmailSender smtpEmailSender(
             @Value("${spring.mail.host:smtp.gmail.com}") String host,
             @Value("${spring.mail.port:587}") int port,
