@@ -1,9 +1,10 @@
 package com.pneumaliback.www.service;
 
+import com.pneumaliback.www.configuration.JwtProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -15,16 +16,13 @@ import java.util.function.Function;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String secretKey;
-
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    private final JwtProperties jwtProperties;
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes();
+        byte[] keyBytes = jwtProperties.getSecret().getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -59,11 +57,11 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
-        return buildToken(extraClaims, userDetails, jwtExpiration);
+        return buildToken(extraClaims, userDetails, jwtProperties.getExpiration());
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, jwtExpiration * 2);
+        return buildToken(new HashMap<>(), userDetails, jwtProperties.getRefreshExpiration());
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
