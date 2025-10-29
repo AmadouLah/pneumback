@@ -36,11 +36,12 @@ public class MailConfig {
 
     /**
      * Bean EmailSender pour mode développement sans email
-     * Activé quand app.mail.provider=logonly
+     * Activé quand app.mail.provider=logonly OU si aucun provider valide n'est
+     * configuré (défaut)
      * Log les codes dans la console au lieu d'envoyer des emails
      */
     @Bean
-    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "logonly")
+    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "logonly", matchIfMissing = true)
     public EmailSender logOnlyEmailSender() {
         log.warn("⚠️  Configuration email : LogOnly (Mode Développement)");
         log.warn("⚠️  Les emails seront affichés dans les logs au lieu d'être envoyés");

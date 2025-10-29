@@ -27,15 +27,16 @@ USER spring
 
 EXPOSE 10000
 
-ENV JAVA_OPTS="-Xms96m -Xmx350m \
+ENV JAVA_OPTS="-Xms96m -Xmx380m \
     -XX:+UseSerialGC \
-    -XX:MaxMetaspaceSize=96m \
-    -XX:CompressedClassSpaceSize=32m \
-    -XX:ReservedCodeCacheSize=32m \
+    -XX:MaxMetaspaceSize=120m \
+    -XX:CompressedClassSpaceSize=24m \
+    -XX:ReservedCodeCacheSize=24m \
     -XX:+TieredCompilation \
     -XX:TieredStopAtLevel=1 \
     -XX:MinHeapFreeRatio=20 \
     -XX:MaxHeapFreeRatio=40 \
+    -XX:+UseStringDeduplication \
     -Djava.awt.headless=true \
     -Djava.security.egd=file:/dev/./urandom"
 
