@@ -25,14 +25,14 @@ public class MailService {
     @Async
     public void sendVerificationEmail(String toEmail, String code) {
         if (toEmail == null || toEmail.trim().isEmpty() || code == null || code.trim().isEmpty()) {
-            log.warn("Paramètres email invalides");
+            log.warn("⚠️ Paramètres email invalides - toEmail: {}, code: {}", toEmail, code != null ? "***" : "null");
             return;
         }
 
         String subject = "Votre code de connexion PneuMali";
         String body = "Bonjour,\n\n"
                 + "Vous avez demandé à vous connecter à votre compte PneuMali.\n\n"
-                + "Votre code de connexion est : " + code + "\n\n"
+                + "Votre code de connexion est: " + code + "\n\n"
                 + "Ce code est valide pendant 2 minutes.\n\n"
                 + "Pour votre sécurité, ne partagez jamais ce code avec qui que ce soit.\n\n"
                 + "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.\n\n"

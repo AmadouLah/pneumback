@@ -349,20 +349,22 @@ public class AuthService {
     }
 
     private void sendVerificationCode(User user, boolean isResend) {
-        Instant now = Instant.now();
         if (!isResend) {
             user.setOtpAttempts(0);
             user.setOtpLockedUntil(null);
             user.setOtpResendCount(0);
         }
-        String code = generateVerificationCode();
+
+        String plainCode = generateVerificationCode();
+        String hashedCode = passwordEncoder.encode(plainCode);
+        Instant now = Instant.now();
         Instant expiry = now.plus(2, ChronoUnit.MINUTES);
-        String hash = passwordEncoder.encode(code);
-        user.setVerificationCode(hash);
+
+        user.setVerificationCode(hashedCode);
         user.setVerificationExpiry(expiry);
         user.setVerificationSentAt(now);
         userRepository.saveAndFlush(user);
-        mailService.sendVerificationEmail(user.getEmail(), code);
+        mailService.sendVerificationEmail(user.getEmail(), plainCode);
         auditService.logAuthEvent("MAGIC_CODE_SENT", user.getEmail(), null, null, null);
     }
 
@@ -390,11 +392,18 @@ public class AuthService {
         // Étape 1 : Vérifier si l'utilisateur existe déjà (insensible à la casse)
         var existingUser = userRepository.findByEmailIgnoreCase(normalized);
 
-        // SÉCURITÉ : Bloquer magicStart pour les comptes LOCAL (ADMIN/DEV)
-        if (existingUser.isPresent() &&
-                existingUser.get().getAuthProvider() == com.pneumaliback.www.enums.AuthProvider.LOCAL) {
-            throw new RuntimeException(
-                    "Ce compte nécessite une authentification par mot de passe. Veuillez utiliser la connexion classique.");
+        // SÉCURITÉ : Bloquer magicStart uniquement pour les rôles ADMIN/DEVELOPER
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            boolean isPrivileged = user.getRole() == Role.ADMIN || user.getRole() == Role.DEVELOPER;
+            if (isPrivileged) {
+                log.warn("❌ Tentative de connexion magicStart rejetée pour compte privilégié ({}): {}",
+                        user.getRole(), normalized);
+                auditService.logAuthEvent("MAGIC_START_BLOCKED_PRIVILEGED_ACCOUNT", normalized, null, null,
+                        java.util.Map.of("role", user.getRole().name()));
+                throw new IllegalArgumentException(
+                        "Ce compte nécessite une authentification par mot de passe. Veuillez utiliser la connexion classique.");
+            }
         }
 
         boolean isNewUser = existingUser.isEmpty();

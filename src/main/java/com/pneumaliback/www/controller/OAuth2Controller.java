@@ -89,22 +89,32 @@ public class OAuth2Controller {
         }
 
         try {
-            // Échanger le code contre les informations utilisateur et envoyer le code de
-            // vérification
-            String email = oauth2Service.processGoogleCallback(code, redirectUri);
+            // Traiter le callback OAuth2
+            var result = oauth2Service.processGoogleCallback(code, redirectUri);
 
-            // Rediriger vers la page de vérification avec l'email
+            // Rediriger vers la page de vérification (flux Google/clients uniquement)
             String verifyUrl = UriComponentsBuilder
                     .fromUriString(frontendUrl)
                     .path("/auth/verify")
-                    .queryParam("email", email)
+                    .queryParam("email", result.getEmail())
                     .queryParam("oauth", "google")
                     .build()
                     .toUriString();
 
-            log.info("Redirection vers la page de vérification pour: {}", email);
+            log.info("Redirection vers la page de vérification pour: {}", result.getEmail());
             response.sendRedirect(verifyUrl);
 
+        } catch (IllegalArgumentException e) {
+            // Compte LOCAL bloqué → redirection vers login avec message d'erreur
+            log.warn("Compte LOCAL bloqué pour connexion Google: {}", e.getMessage());
+            String errorUrl = UriComponentsBuilder
+                    .fromUriString(frontendUrl)
+                    .path("/auth/login")
+                    .queryParam("error", "oauth_blocked")
+                    .queryParam("message", "Cette adresse email nécessite une authentification par mot de passe")
+                    .build()
+                    .toUriString();
+            response.sendRedirect(errorUrl);
         } catch (Exception e) {
             log.error("Erreur lors du traitement du callback Google", e);
             String errorUrl = UriComponentsBuilder

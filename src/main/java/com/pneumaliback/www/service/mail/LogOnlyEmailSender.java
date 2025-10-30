@@ -21,10 +21,10 @@ public class LogOnlyEmailSender implements EmailSender {
         log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         // Extraire le code de vérification du body pour faciliter les tests
-        if (body.contains("code de vérification:")) {
+        if (body.contains("code de connexion est:")) {
             String[] lines = body.split("\n");
             for (String line : lines) {
-                if (line.contains("code de vérification:")) {
+                if (line.contains("code de connexion est:")) {
                     String code = line.substring(line.indexOf(":") + 1).trim();
                     log.warn("🔑 CODE DE VÉRIFICATION: {}", code);
                     break;

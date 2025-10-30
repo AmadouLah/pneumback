@@ -37,16 +37,13 @@ public class OAuth2Service {
     private String clientSecret;
 
     /**
-     * Traite le callback OAuth2 de Google
-     * Échange le code d'autorisation contre les informations utilisateur
-     * Crée ou récupère l'utilisateur et envoie un code de vérification
-     * 
-     * @param code        Code d'autorisation de Google
-     * @param redirectUri URI de redirection
-     * @return Email de l'utilisateur
+     * Traite le callback OAuth2 de Google.
+     * Retourne un résultat indiquant si un mot de passe local est requis (ADMIN/DEV
+     * local)
+     * ou si l'on poursuit le flux OTP (comptes Google/clients).
      */
     @Transactional
-    public String processGoogleCallback(String code, String redirectUri) {
+    public OAuthResult processGoogleCallback(String code, String redirectUri) {
         log.info("Traitement du callback Google OAuth2");
 
         // Étape 1 : Échanger le code contre un access token
@@ -68,15 +65,19 @@ public class OAuth2Service {
 
         log.info("Authentification Google réussie pour: {}", email);
 
-        // Étape 4 : Vérifier si le compte existe et est LOCAL (SÉCURITÉ CRITIQUE)
+        // Étape 4 : Vérifier si l'utilisateur existe
         var existingUserOpt = userRepository.findByEmailIgnoreCase(email);
+
+        // Si compte ADMIN/DEVELOPER → BLOCKER Google OAuth
         if (existingUserOpt.isPresent()) {
             User existingUser = existingUserOpt.get();
-            // Si le compte utilise authProvider LOCAL (admin/dev créé localement), BLOQUER
-            // Google OAuth
-            if (existingUser.getAuthProvider() == com.pneumaliback.www.enums.AuthProvider.LOCAL) {
-                log.warn("Tentative de connexion Google bloquée pour un compte LOCAL: {}", email);
-                throw new RuntimeException(
+            boolean isPrivileged = existingUser.getRole() == Role.ADMIN || existingUser.getRole() == Role.DEVELOPER;
+            if (isPrivileged) {
+                log.warn("❌ Tentative de connexion Google rejetée pour compte privilégié ({}): {}",
+                        existingUser.getRole(), email);
+                auditService.logAuthEvent("GOOGLE_OAUTH_BLOCKED_PRIVILEGED_ACCOUNT", email, null, null,
+                        Map.of("role", existingUser.getRole().name()));
+                throw new IllegalArgumentException(
                         "Ce compte nécessite une authentification par mot de passe. Veuillez utiliser la connexion classique.");
             }
         }
@@ -106,7 +107,7 @@ public class OAuth2Service {
             user.setGoogleId(googleId);
         }
 
-        // Mettre à jour les informations si nécessaire
+        // Mettre à jour les informations si nécessaires
         if ((firstName != null && !firstName.equals(user.getFirstName())) ||
                 (lastName != null && !lastName.equals(user.getLastName()))) {
             if (firstName != null)
@@ -121,13 +122,26 @@ public class OAuth2Service {
         // Sauvegarder AVANT d'envoyer le code
         user = userRepository.saveAndFlush(user);
 
-        // Étape 5 : Générer et envoyer le code de vérification
+        // Étape 6 : Générer et envoyer le code de vérification
         sendVerificationCode(user);
 
-        auditService.logAuthEvent("GOOGLE_OAUTH_INITIATED", email, null, null,
-                Map.of("googleId", googleId));
+        auditService.logAuthEvent("GOOGLE_OAUTH_INITIATED", email, null, null, Map.of("googleId", googleId));
+        return new OAuthResult(email);
+    }
 
-        return email;
+    /**
+     * Résultat du traitement OAuth2
+     */
+    public static final class OAuthResult {
+        private final String email;
+
+        public OAuthResult(String email) {
+            this.email = email;
+        }
+
+        public String getEmail() {
+            return email;
+        }
     }
 
     /**
@@ -196,17 +210,14 @@ public class OAuth2Service {
     }
 
     /**
-     * Génère et envoie le code de vérification
-     * Le code est généré AVANT sauvegarde pour éviter les problèmes d'async
+     * Génère et envoie le code de vérification OTP
      */
     private void sendVerificationCode(User user) {
-        // Générer le code en clair AVANT de le hasher
         String plainCode = generateVerificationCode();
         String hashedCode = passwordEncoder.encode(plainCode);
         Instant now = Instant.now();
         Instant expiry = now.plus(2, ChronoUnit.MINUTES);
 
-        // Mettre à jour l'utilisateur avec le code hashé
         user.setVerificationCode(hashedCode);
         user.setVerificationExpiry(expiry);
         user.setVerificationSentAt(now);
@@ -214,19 +225,12 @@ public class OAuth2Service {
         user.setOtpResendCount(0);
         user.setOtpLockedUntil(null);
 
-        // Sauvegarder AVANT d'envoyer l'email
         userRepository.saveAndFlush(user);
-
-        // Envoyer l'email (async, mais le code est déjà en base)
         mailService.sendVerificationEmail(user.getEmail(), plainCode);
 
-        log.info("Code de vérification généré et sauvegardé pour: {}. Email envoyé de manière asynchrone.",
-                user.getEmail());
+        log.info("Code OTP généré pour: {}", user.getEmail());
     }
 
-    /**
-     * Génère un code de vérification à 6 chiffres
-     */
     private String generateVerificationCode() {
         SecureRandom random = new SecureRandom();
         int code = random.nextInt(1_000_000);

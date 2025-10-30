@@ -9,6 +9,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,6 +22,7 @@ public class DataInitializationService implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
@@ -40,6 +42,7 @@ public class DataInitializationService implements CommandLineRunner {
     }
 
     private void initializeDefaultUsers() {
+        ensureAuthProviderColumn();
         List<DefaultUser> defaults = Arrays.asList(
                 new DefaultUser(
                         "admin@pneumali.ml",
@@ -189,6 +192,20 @@ public class DataInitializationService implements CommandLineRunner {
                 .otpLockedUntil(null)
                 .otpResendCount(0)
                 .build();
+    }
+
+    /**
+     * Garantit la présence de la colonne auth_provider sur la table users.
+     * S'exécute avant l'initialisation des comptes par défaut.
+     */
+    private void ensureAuthProviderColumn() {
+        try {
+            jdbcTemplate.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider varchar(255) DEFAULT 'LOCAL' NOT NULL");
+            jdbcTemplate.execute("UPDATE users SET auth_provider='LOCAL' WHERE auth_provider IS NULL");
+        } catch (Exception e) {
+            log.warn("ensureAuthProviderColumn: {}", e.getMessage());
+        }
     }
 
     private record DefaultUser(
