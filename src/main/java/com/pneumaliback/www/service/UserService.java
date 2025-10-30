@@ -38,9 +38,17 @@ public class UserService {
      */
     @Transactional
     public User updateProfile(String email, UpdateProfileRequest request) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email utilisateur requis");
+        }
+
+        if (request == null) {
+            throw new IllegalArgumentException("Données de mise à jour requises");
+        }
+
         // Récupérer le compte existant (jamais de création)
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
 
         // Mise à jour du prénom (accepte les valeurs vides pour permettre de vider le
         // champ)
@@ -56,36 +64,35 @@ public class UserService {
 
         // Mise à jour de l'email si fourni et différent
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()
-                && !request.getEmail().trim().equals(user.getEmail())) {
+                && !request.getEmail().trim().equalsIgnoreCase(user.getEmail())) {
 
-            String newEmail = request.getEmail().trim();
+            String newEmail = request.getEmail().trim().toLowerCase();
 
             // Vérifier que le nouvel email n'est pas déjà utilisé par un autre compte
             if (userRepository.existsByEmail(newEmail)) {
-                throw new RuntimeException("Email already in use");
+                throw new IllegalArgumentException("Cet email est déjà utilisé");
             }
 
             // Sauvegarder l'ancien email avant de le changer
             user.setPreviousEmail(user.getEmail());
 
             // Changer l'email du compte existant (pas de nouveau compte créé)
-            // Toutes les données restent : prénom, nom, adresses, commandes, etc.
             user.setEmail(newEmail);
-            user.setEnabled(false); // Désactiver temporairement jusqu'à vérification
+            user.setEnabled(false);
 
-            // Générer un code de vérification à 6 chiffres
+            // Générer et hasher le code de vérification
             String plainCode = generateVerificationCode();
-
-            // Hash le code avant de le stocker (sécurité)
             String hashedCode = passwordEncoder.encode(plainCode);
             user.setVerificationCode(hashedCode);
-            user.setVerificationExpiry(Instant.now().plusSeconds(15 * 60)); // 15 minutes
+            user.setVerificationExpiry(Instant.now().plusSeconds(15 * 60));
             user.setVerificationSentAt(Instant.now());
             user.setOtpAttempts(0);
             user.setOtpResendCount(0);
 
-            // Envoyer l'email de vérification avec le code en clair au NOUVEL email
-            mailService.sendVerificationEmail(user.getEmail(), plainCode);
+            // Sauvegarder d'abord, puis envoyer l'email (async)
+            User savedUser = userRepository.save(user);
+            mailService.sendVerificationEmail(savedUser.getEmail(), plainCode);
+            return savedUser;
         }
 
         // Sauvegarder les modifications du compte existant

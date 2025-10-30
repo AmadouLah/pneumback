@@ -2,7 +2,6 @@ package com.pneumaliback.www.controller;
 
 import com.pneumaliback.www.dto.UpdateProfileRequest;
 import com.pneumaliback.www.entity.User;
-import com.pneumaliback.www.service.AuthService;
 import com.pneumaliback.www.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +17,6 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
-    private final AuthService authService;
 
     /**
      * Mise à jour du profil utilisateur
@@ -30,10 +28,20 @@ public class UserController {
         try {
             User updatedUser = userService.updateProfile(userDetails.getUsername(), request);
             return ResponseEntity.ok(Map.of(
-                    "message", "Profile updated successfully",
-                    "user", updatedUser));
+                    "message", "Profil mis à jour avec succès",
+                    "user", Map.of(
+                            "id", updatedUser.getId(),
+                            "email", updatedUser.getEmail(),
+                            "firstName", updatedUser.getFirstName() != null ? updatedUser.getFirstName() : "",
+                            "lastName", updatedUser.getLastName() != null ? updatedUser.getLastName() : "",
+                            "role", updatedUser.getRole().name())));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Erreur lors de la mise à jour du profil"));
         }
     }
 }
