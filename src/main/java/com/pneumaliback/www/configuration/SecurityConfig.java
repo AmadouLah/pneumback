@@ -77,7 +77,7 @@ public class SecurityConfig {
         private final CustomUserDetailsService userDetailsService;
 
         @Value("${app.cors.allowed-origins:*}")
-        private List<String> allowedOrigins;
+        private String allowedOriginsString;
 
         // ========== Configuration principale ==========
 
@@ -145,9 +145,16 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
 
+                // Parser la chaîne d'origines autorisées (séparée par des virgules)
+                List<String> allowedOrigins = allowedOriginsString == null || allowedOriginsString.trim().isEmpty()
+                                ? List.of("*")
+                                : Arrays.asList(allowedOriginsString.split(",")).stream()
+                                                .map(String::trim)
+                                                .filter(s -> !s.isEmpty())
+                                                .toList();
+
                 // Déterminer si on utilise le wildcard ou des origines spécifiques
-                boolean isWildcard = allowedOrigins == null || allowedOrigins.isEmpty() ||
-                                allowedOrigins.contains("*");
+                boolean isWildcard = allowedOrigins.contains("*");
 
                 if (isWildcard) {
                         // Mode développement : autoriser toutes les origines SANS credentials
