@@ -5,7 +5,6 @@ import com.pneumaliback.www.service.mail.EmailSender;
 import com.pneumaliback.www.service.mail.LogOnlyEmailSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,33 +27,29 @@ public class MailConfig {
     private String fromAddress;
 
     /**
-     * Bean EmailSender pour mode développement sans email
-     * Log les codes dans la console au lieu d'envoyer des emails
+     * Bean EmailSender unique qui choisit automatiquement l'implémentation
+     * selon la configuration :
+     * - Si app.mail.provider=brevo → Utilise Brevo (si API key configurée)
+     * - Sinon → Utilise LogOnly (mode dev ou fallback)
      */
     @Bean
-    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "logonly", matchIfMissing = true)
-    public EmailSender logOnlyEmailSender() {
-        log.warn("⚠️  Configuration email : LogOnly (Mode Développement)");
-        log.warn("⚠️  Les emails seront affichés dans les logs au lieu d'être envoyés");
-        return new LogOnlyEmailSender();
-    }
-
-    /**
-     * Bean EmailSender pour Brevo (API HTTP)
-     * Avec fallback vers LogOnly si la clé API est manquante
-     */
-    @Bean
-    @ConditionalOnProperty(name = "app.mail.provider", havingValue = "brevo")
-    public EmailSender brevoEmailSender(
+    public EmailSender emailSender(
+            @Value("${app.mail.provider:logonly}") String provider,
             @Value("${app.mail.brevo.api-key:}") String apiKey) {
 
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            log.error("❌ BREVO_API_KEY non configuré ! Utilisation du mode LogOnly");
-            return new LogOnlyEmailSender();
+        // Mode Brevo activé et API key présente
+        if ("brevo".equalsIgnoreCase(provider) && apiKey != null && !apiKey.trim().isEmpty()) {
+            log.info("✅ Configuration email : Brevo (API HTTP) - From: {}", fromAddress);
+            log.info("💡 Brevo: 300 emails gratuits/jour");
+            return new BrevoEmailSender(apiKey, fromAddress);
         }
 
-        log.info("✅ Configuration email : Brevo (API HTTP) - From: {}", fromAddress);
-        log.info("💡 Brevo: 300 emails gratuits/jour");
-        return new BrevoEmailSender(apiKey, fromAddress);
+        // Mode LogOnly (par défaut ou si Brevo non configuré)
+        log.warn("⚠️  Configuration email : LogOnly (Mode Développement/Fallback)");
+        log.warn("⚠️  Les emails seront affichés dans les logs au lieu d'être envoyés");
+        if ("brevo".equalsIgnoreCase(provider)) {
+            log.warn("⚠️  Provider=brevo mais BREVO_API_KEY manquante, fallback vers LogOnly");
+        }
+        return new LogOnlyEmailSender();
     }
 }
