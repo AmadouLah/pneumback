@@ -40,12 +40,26 @@ public class SendGridEmailSender implements EmailSender {
         request.setEndpoint("mail/send");
         request.setBody(mail.build());
 
-        Response response = sendGridClient.api(request);
+        log.info("📤 Tentative d'envoi via SendGrid: from={}, to={}", fromAddress, to);
 
-        if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
-            log.debug("Email envoyé via SendGrid à {} (status: {})", to, response.getStatusCode());
+        Response response = sendGridClient.api(request);
+        int statusCode = response.getStatusCode();
+        String responseBody = response.getBody();
+
+        log.info("📨 Réponse SendGrid: status={}, body={}", statusCode,
+                responseBody != null && !responseBody.isEmpty() ? responseBody : "empty");
+
+        if (statusCode >= 200 && statusCode < 300) {
+            log.info("✅ Email RÉELLEMENT envoyé via SendGrid à {} (status: {})", to, statusCode);
         } else {
-            throw new IOException("Erreur SendGrid: " + response.getStatusCode() + " - " + response.getBody());
+            String errorMsg = String.format("SendGrid a refusé l'envoi (status: %d) - Réponse: %s",
+                    statusCode, responseBody);
+            log.error("❌ {}", errorMsg);
+            log.error("💡 Vérifiez dans SendGrid Dashboard:");
+            log.error("   1. L'adresse '{}' est-elle vérifiée ? (Settings → Sender Authentication)", fromAddress);
+            log.error("   2. La clé API a-t-elle les permissions 'Mail Send' ?");
+            log.error("   3. Consultez Activity pour voir les emails bloqués");
+            throw new IOException(errorMsg);
         }
     }
 

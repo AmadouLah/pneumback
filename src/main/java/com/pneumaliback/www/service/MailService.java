@@ -42,11 +42,13 @@ public class MailService {
 
     private void sendEmailSafely(String to, String subject, String body, String type) {
         try {
+            log.info("📧 Préparation envoi email {} via {} à {}", type, emailSender.getProviderName(), to);
             emailSender.sendEmail(to, subject, body);
-            log.info("✅ Email {} envoyé via {} à {}", type, emailSender.getProviderName(), to);
+            log.info("✅ Email {} CONFIRMÉ envoyé via {} à {}", type, emailSender.getProviderName(), to);
         } catch (Exception e) {
-            log.error("❌ Erreur envoi email {} à {} : {}", type, to, e.getMessage());
-            log.debug("Détails erreur", e);
+            log.error("❌ ÉCHEC envoi email {} à {} via {}", type, to, emailSender.getProviderName());
+            log.error("❌ Raison: {}", e.getMessage());
+            log.error("❌ Stack trace:", e);
         }
     }
 
