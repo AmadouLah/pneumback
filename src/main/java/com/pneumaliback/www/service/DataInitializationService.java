@@ -125,6 +125,12 @@ public class DataInitializationService implements CommandLineRunner {
                     needUpdate = true;
                 }
 
+                // Assurer que les comptes par défaut ont authProvider = LOCAL
+                if (existing.getAuthProvider() != com.pneumaliback.www.enums.AuthProvider.LOCAL) {
+                    existing.setAuthProvider(com.pneumaliback.www.enums.AuthProvider.LOCAL);
+                    needUpdate = true;
+                }
+
                 // Nettoyage de l'état OTP / vérification UNIQUEMENT pour les comptes par défaut
                 // ADMIN/DEV
                 if ((du.role() == Role.ADMIN || du.role() == Role.DEVELOPER) &&
@@ -169,6 +175,7 @@ public class DataInitializationService implements CommandLineRunner {
                 .lastName(du.lastName())
                 .phoneNumber(du.phone())
                 .role(du.role())
+                .authProvider(com.pneumaliback.www.enums.AuthProvider.LOCAL)
                 .accountNonExpired(true)
                 .accountNonLocked(true)
                 .credentialsNonExpired(true)

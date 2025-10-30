@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import com.pneumaliback.www.enums.AuthProvider;
 import com.pneumaliback.www.enums.Country;
 import com.pneumaliback.www.enums.Role;
 
@@ -53,6 +54,11 @@ public class User extends EntiteAuditable implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private AuthProvider authProvider = AuthProvider.LOCAL;
 
     @Column(nullable = false)
     @Builder.Default

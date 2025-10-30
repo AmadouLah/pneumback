@@ -68,8 +68,21 @@ public class OAuth2Service {
 
         log.info("Authentification Google réussie pour: {}", email);
 
-        // Étape 4 : Créer ou récupérer l'utilisateur (insensible à la casse)
-        User user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+        // Étape 4 : Vérifier si le compte existe et est LOCAL (SÉCURITÉ CRITIQUE)
+        var existingUserOpt = userRepository.findByEmailIgnoreCase(email);
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            // Si le compte utilise authProvider LOCAL (admin/dev créé localement), BLOQUER
+            // Google OAuth
+            if (existingUser.getAuthProvider() == com.pneumaliback.www.enums.AuthProvider.LOCAL) {
+                log.warn("Tentative de connexion Google bloquée pour un compte LOCAL: {}", email);
+                throw new RuntimeException(
+                        "Ce compte nécessite une authentification par mot de passe. Veuillez utiliser la connexion classique.");
+            }
+        }
+
+        // Étape 5 : Créer ou récupérer l'utilisateur Google
+        User user = existingUserOpt.orElseGet(() -> {
             log.info("Création d'un nouvel utilisateur via Google OAuth2: {}", email);
             User newUser = User.builder()
                     .email(email)
@@ -78,6 +91,7 @@ public class OAuth2Service {
                     .googleId(googleId)
                     .password(passwordEncoder.encode(generateSecurePassword()))
                     .role(Role.CLIENT)
+                    .authProvider(com.pneumaliback.www.enums.AuthProvider.GOOGLE)
                     .accountNonExpired(true)
                     .accountNonLocked(true)
                     .credentialsNonExpired(true)

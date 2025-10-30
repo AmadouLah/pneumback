@@ -389,11 +389,20 @@ public class AuthService {
 
         // Étape 1 : Vérifier si l'utilisateur existe déjà (insensible à la casse)
         var existingUser = userRepository.findByEmailIgnoreCase(normalized);
+
+        // SÉCURITÉ : Bloquer magicStart pour les comptes LOCAL (ADMIN/DEV)
+        if (existingUser.isPresent() &&
+                existingUser.get().getAuthProvider() == com.pneumaliback.www.enums.AuthProvider.LOCAL) {
+            throw new RuntimeException(
+                    "Ce compte nécessite une authentification par mot de passe. Veuillez utiliser la connexion classique.");
+        }
+
         boolean isNewUser = existingUser.isEmpty();
 
         User user;
         if (isNewUser) {
-            // CAS 1 : INSCRIPTION - Créer un nouveau compte (une seule fois)
+            // CAS 1 : INSCRIPTION - Créer un nouveau compte via magic link (Google OAuth
+            // type)
             log.info("Nouvelle inscription pour l'email : {}", normalized);
             user = User.builder()
                     .email(normalized)
@@ -401,6 +410,7 @@ public class AuthService {
                     .firstName("")
                     .lastName("")
                     .role(Role.CLIENT)
+                    .authProvider(com.pneumaliback.www.enums.AuthProvider.GOOGLE)
                     .accountNonExpired(true)
                     .accountNonLocked(true)
                     .credentialsNonExpired(true)
@@ -410,7 +420,7 @@ public class AuthService {
             user = userRepository.saveAndFlush(user);
             auditService.logAuthEvent("NEW_USER_REGISTRATION", user.getEmail(), null, null, null);
         } else {
-            // CAS 2 : CONNEXION - Réutiliser le compte existant (pas de duplication)
+            // CAS 2 : CONNEXION - Réutiliser le compte existant (déjà validé comme GOOGLE)
             user = existingUser.get();
             log.info("Reconnexion pour l'utilisateur existant : {}", normalized);
             auditService.logAuthEvent("EXISTING_USER_RECONNECTION", user.getEmail(), null, null, null);
