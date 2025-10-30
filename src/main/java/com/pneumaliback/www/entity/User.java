@@ -89,6 +89,9 @@ public class User extends EntiteAuditable implements UserDetails {
     @Column(length = 100)
     private String previousEmail; // Stocke l'ancien email lors du changement
 
+    @Column(unique = true, length = 255)
+    private String googleId; // ID Google OAuth2
+
     @Column
     private Integer otpAttempts;
 

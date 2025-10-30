@@ -1,0 +1,113 @@
+===============================================
+CONFIGURATION GOOGLE OAUTH2 - PneuMali
+===============================================
+
+Pour activer la connexion avec Google, vous devez créer un projet Google Cloud et obtenir les credentials OAuth2.
+
+ÉTAPE 1: CRÉER UN PROJET GOOGLE CLOUD
+---------------------------------------
+1. Aller sur https://console.cloud.google.com/
+2. Créer un nouveau projet ou sélectionner un projet existant
+3. Nommer le projet (ex: "PneuMali")
+
+ÉTAPE 2: ACTIVER L'API GOOGLE+
+-------------------------------
+1. Dans le menu, aller dans "APIs & Services" > "Library"
+2. Rechercher "Google+ API" et l'activer
+
+ÉTAPE 3: CRÉER LES CREDENTIALS OAUTH2
+--------------------------------------
+1. Aller dans "APIs & Services" > "Credentials"
+2. Cliquer sur "Create Credentials" > "OAuth client ID"
+3. Si demandé, configurer l'écran de consentement OAuth:
+   - Type d'application: External
+   - Nom de l'application: PneuMali
+   - Email d'assistance utilisateur: votre email
+   - Domaine autorisé (optionnel): pneumali.ml
+   - Scopes: email, profile
+   - Utilisateurs de test (mode dev): ajouter vos emails de test
+
+4. Créer l'OAuth client ID:
+   - Type d'application: Web application
+   - Nom: PneuMali Web Client
+   
+   - URIs de redirection autorisées (IMPORTANT):
+     * Développement: http://localhost:9999/api/auth/oauth2/callback/google
+     * Production: https://pneumback.onrender.com/api/auth/oauth2/callback/google
+   
+   - Origines JavaScript autorisées (optionnel):
+     * http://localhost:4200
+     * https://pneufront.vercel.app
+
+5. Copier le "Client ID" et le "Client secret" générés
+
+ÉTAPE 4: CONFIGURER LES VARIABLES D'ENVIRONNEMENT
+--------------------------------------------------
+A. Développement local (application-local.properties):
+   GOOGLE_CLIENT_ID=votre_client_id
+   GOOGLE_CLIENT_SECRET=votre_client_secret
+
+B. Production Render.com:
+   1. Aller dans votre service Render
+   2. Onglet "Environment"
+   3. Ajouter les variables:
+      - GOOGLE_CLIENT_ID = votre_client_id
+      - GOOGLE_CLIENT_SECRET = votre_client_secret
+   4. Les variables APP_BASE_URL et APP_FRONTEND_URL sont déjà configurées dans render.yaml
+
+ÉTAPE 5: TESTER LA CONNEXION
+-----------------------------
+1. Redémarrer l'application backend
+2. Sur la page de login, cliquer sur "Continuer avec Google"
+3. Sélectionner votre compte Google
+4. Autoriser l'accès aux informations (email, profil)
+5. Vous serez redirigé vers la page de vérification
+6. Un code à 6 chiffres sera envoyé à votre email
+7. Entrer le code pour finaliser la connexion
+
+FLUX D'AUTHENTIFICATION OAUTH2
+-------------------------------
+1. Frontend: Click sur "Continuer avec Google"
+2. Frontend: Redirection vers /api/auth/oauth2/google/login
+3. Backend: Redirection vers Google OAuth
+4. Google: Authentification de l'utilisateur
+5. Google: Redirection vers /api/auth/oauth2/callback/google avec code
+6. Backend: Échange du code contre les infos utilisateur
+7. Backend: Création/récupération de l'utilisateur
+8. Backend: Génération et envoi du code de vérification (6 chiffres)
+9. Backend: Redirection vers /auth/verify?email=...&oauth=google
+10. Frontend: Affichage de la page de vérification
+11. User: Saisie du code reçu par email
+12. Backend: Validation du code et génération du JWT
+13. Frontend: Connexion réussie
+
+SÉCURITÉ
+--------
+- Le code de vérification est valide pendant 2 minutes
+- Maximum 5 tentatives de saisie du code (puis blocage 2 minutes)
+- Les mots de passe des comptes OAuth2 sont générés aléatoirement (32 caractères)
+- Le googleId est stocké pour lier le compte Google à l'utilisateur
+
+NOTES IMPORTANTES
+-----------------
+- Les utilisateurs créés via Google OAuth2 ont le rôle CLIENT par défaut
+- Même avec OAuth2, la vérification par code à 6 chiffres est OBLIGATOIRE
+- Les informations récupérées de Google: email, firstName, lastName, googleId
+- Si l'utilisateur existe déjà avec cet email, on associe son googleId
+- Un utilisateur peut se connecter avec Google OU avec email/mot de passe
+
+DÉPANNAGE
+---------
+Erreur "redirect_uri_mismatch":
+  -> Vérifier que l'URI de redirection dans Google Cloud Console correspond exactement
+  -> Format: https://pneumback.onrender.com/api/auth/oauth2/callback/google
+
+Erreur "invalid_client":
+  -> Vérifier que GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET sont correctement configurés
+  
+Code de vérification non reçu:
+  -> Vérifier la configuration SendGrid (SENDGRID_API_KEY)
+  -> Vérifier les logs backend pour l'envoi du code
+
+===============================================
+
