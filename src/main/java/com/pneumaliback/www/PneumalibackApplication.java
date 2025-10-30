@@ -9,8 +9,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Application principale PneuMali Backend
  * 
  * Envoi d'emails géré par Pattern Strategy (voir MailConfig) :
- * - Local : SMTP classique
- * - Render : SendGrid API HTTP
+ * - Production : Brevo API HTTP
+ * - Développement : LogOnly
  */
 @SpringBootApplication
 @EnableScheduling

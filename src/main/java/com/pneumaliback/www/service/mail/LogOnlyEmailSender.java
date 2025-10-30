@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Implémentation pour développement sans service email configuré
  * Log simplement les codes dans la console au lieu d'envoyer des emails
- * Utile quand SendGrid/SMTP n'est pas encore configuré
+ * Utile quand Brevo n'est pas encore configuré
  */
 @Slf4j
 public class LogOnlyEmailSender implements EmailSender {

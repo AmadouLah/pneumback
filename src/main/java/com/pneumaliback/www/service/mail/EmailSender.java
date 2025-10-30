@@ -3,7 +3,7 @@ package com.pneumaliback.www.service.mail;
 /**
  * Interface pour l'envoi d'emails
  * Pattern Strategy : permet de basculer entre différentes implémentations
- * (SMTP classique, SendGrid API, etc.) sans modifier le code client
+ * (Brevo API, LogOnly) sans modifier le code client
  */
 public interface EmailSender {
 

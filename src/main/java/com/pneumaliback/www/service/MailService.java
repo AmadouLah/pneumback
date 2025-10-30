@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service unifié pour l'envoi d'emails
  * Utilise le pattern Strategy via l'interface EmailSender
- * Supporte automatiquement SMTP et SendGrid selon la configuration
+ * Supporte Brevo (production) et LogOnly (développement)
  */
 @Service
 @RequiredArgsConstructor

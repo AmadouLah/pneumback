@@ -33,10 +33,6 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 		<dependency>
@@ -124,12 +120,7 @@
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.7.0</version>
 		</dependency>
-		<!-- SendGrid pour envoi d'emails via API HTTP (compatible Render) -->
-		<dependency>
-			<groupId>com.sendgrid</groupId>
-			<artifactId>sendgrid-java</artifactId>
-			<version>4.10.2</version>
-		</dependency>
+		<!-- Pas de dépendance nécessaire - utilisation directe de l'API HTTP de Brevo -->
 	</dependencies>
 
 	<build>
