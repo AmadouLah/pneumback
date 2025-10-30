@@ -128,6 +128,7 @@ public class AuthService {
      * - L'utilisateur n'a pas reçu le premier code
      * - Le code a expiré
      * - L'utilisateur veut se reconnecter après expiration du token
+     * - Admin/Developer en attente de code 2FA
      */
     @Transactional
     public MessageResponse resendVerificationCode(ResendVerificationRequest request) {
@@ -135,9 +136,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // Vérifier que le compte n'est pas déjà activé et connecté
-        if (user.isEnabled()) {
-            throw new RuntimeException("Compte déjà activé");
+        // Pour les comptes activés sans code en attente, pas de renvoi possible
+        // (sauf si c'est pour un 2FA en cours indiqué par verificationCode existant)
+        if (user.isEnabled() && user.getVerificationCode() == null) {
+            throw new RuntimeException("Aucun code de vérification en attente");
         }
 
         Instant now = Instant.now();
