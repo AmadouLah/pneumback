@@ -29,13 +29,16 @@ public class MailService {
             return;
         }
 
-        String subject = "Vérification de votre compte - PneuMali";
+        String subject = "Votre code de connexion PneuMali";
         String body = "Bonjour,\n\n"
-                + "Voici votre code de vérification: " + code + "\n"
-                + "Ce code expire dans 2 minutes.\n\n"
-                + "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.\n\n"
+                + "Vous avez demandé à vous connecter à votre compte PneuMali.\n\n"
+                + "Votre code de connexion est : " + code + "\n\n"
+                + "Ce code est valide pendant 2 minutes.\n\n"
+                + "Pour votre sécurité, ne partagez jamais ce code avec qui que ce soit.\n\n"
+                + "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.\n\n"
                 + "Cordialement,\n"
-                + "L'équipe PneuMali";
+                + "L'équipe PneuMali\n"
+                + "Votre spécialiste pneus au Mali";
 
         sendEmailSafely(toEmail, subject, body, "vérification");
     }

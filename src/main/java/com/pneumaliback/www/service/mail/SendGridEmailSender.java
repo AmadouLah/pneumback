@@ -30,35 +30,38 @@ public class SendGridEmailSender implements EmailSender {
 
     @Override
     public void sendEmail(String to, String subject, String body) throws IOException {
-        Email from = new Email(fromAddress);
+        Email from = new Email(fromAddress, "PneuMali");
         Email toEmail = new Email(to);
+        Email replyTo = new Email(fromAddress);
+
         Content content = new Content("text/plain", body);
         Mail mail = new Mail(from, subject, toEmail, content);
+        mail.setReplyTo(replyTo);
 
         Request request = new Request();
         request.setMethod(Method.POST);
         request.setEndpoint("mail/send");
         request.setBody(mail.build());
 
-        log.info("📤 Tentative d'envoi via SendGrid: from={}, to={}", fromAddress, to);
+        log.info("📤 Envoi via SendGrid: from={}, to={}", fromAddress, to);
 
         Response response = sendGridClient.api(request);
         int statusCode = response.getStatusCode();
         String responseBody = response.getBody();
 
-        log.info("📨 Réponse SendGrid: status={}, body={}", statusCode,
-                responseBody != null && !responseBody.isEmpty() ? responseBody : "empty");
-
         if (statusCode >= 200 && statusCode < 300) {
-            log.info("✅ Email RÉELLEMENT envoyé via SendGrid à {} (status: {})", to, statusCode);
+            log.info("✅ Email envoyé à {} (status: {})", to, statusCode);
+            if (statusCode == 202) {
+                log.warn("⚠️  Email accepté mais peut arriver en SPAM sans SPF/DKIM configuré");
+                log.warn("💡 Pour éviter les spams, configurez l'authentification de domaine:");
+                log.warn("   → https://app.sendgrid.com/settings/sender_auth");
+                log.warn("   → Authenticate Your Domain (recommandé)");
+                log.warn("   → Cela configure SPF et DKIM automatiquement");
+            }
         } else {
-            String errorMsg = String.format("SendGrid a refusé l'envoi (status: %d) - Réponse: %s",
+            String errorMsg = String.format("SendGrid erreur (status: %d) - %s",
                     statusCode, responseBody);
             log.error("❌ {}", errorMsg);
-            log.error("💡 Vérifiez dans SendGrid Dashboard:");
-            log.error("   1. L'adresse '{}' est-elle vérifiée ? (Settings → Sender Authentication)", fromAddress);
-            log.error("   2. La clé API a-t-elle les permissions 'Mail Send' ?");
-            log.error("   3. Consultez Activity pour voir les emails bloqués");
             throw new IOException(errorMsg);
         }
     }

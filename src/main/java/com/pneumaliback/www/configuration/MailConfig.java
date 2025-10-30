@@ -59,13 +59,16 @@ public class MailConfig {
             @Value("${app.mail.sendgrid.api-key:}") String apiKey) {
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            log.error("❌ SENDGRID_API_KEY non configuré ! Utilisation du mode LogOnly comme fallback");
-            log.error("⚠️  Configurez SENDGRID_API_KEY dans Render ou utilisez app.mail.provider=logonly");
+            log.error("❌ SENDGRID_API_KEY non configuré ! Utilisation du mode LogOnly");
             return new LogOnlyEmailSender();
         }
 
         SendGrid sendGridClient = new SendGrid(apiKey);
-        log.info("✅ Configuration email : SendGrid (API HTTP)");
+        log.info("✅ Configuration email : SendGrid (API HTTP) - From: {}", fromAddress);
+        log.info("💡 Pour éviter que les emails arrivent en spam:");
+        log.info("   1. Authentifiez votre domaine dans SendGrid (SPF/DKIM)");
+        log.info("   2. https://app.sendgrid.com/settings/sender_auth");
+        log.info("   3. Ou utilisez 'Authenticate Your Domain' pour configuration automatique");
         return new SendGridEmailSender(sendGridClient, fromAddress);
     }
 
