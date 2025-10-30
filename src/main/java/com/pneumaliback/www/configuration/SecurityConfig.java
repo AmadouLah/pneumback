@@ -166,14 +166,8 @@ public class SecurityConfig {
                 }
 
                 configuration.setAllowedMethods(Arrays.asList(CORS_METHODS));
-                configuration.setAllowedHeaders(Arrays.asList(
-                                "Authorization",
-                                "Content-Type",
-                                "X-Requested-With",
-                                "X-Forwarded-For",
-                                "X-Real-IP",
-                                "Accept",
-                                "Origin"));
+                // Autoriser tous les en-têtes (inclut sec-ch-ua, etc.)
+                configuration.setAllowedHeaders(List.of("*"));
                 configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
                 configuration.setMaxAge(3600L); // Cache preflight 1h
 
@@ -181,6 +175,14 @@ public class SecurityConfig {
                 // Appliquer sur toute l'API (y compris OPTIONS)
                 source.registerCorsConfiguration("/**", configuration);
                 return source;
+        }
+
+        /**
+         * Filtre CORS de haut niveau pour garantir les en-têtes sur toutes les réponses
+         */
+        @Bean
+        public org.springframework.web.filter.CorsFilter corsFilter() {
+                return new org.springframework.web.filter.CorsFilter(corsConfigurationSource());
         }
 
         // ========== Beans d'authentification ==========
