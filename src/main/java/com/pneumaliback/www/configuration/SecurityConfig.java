@@ -79,6 +79,9 @@ public class SecurityConfig {
         @Value("${app.cors.allowed-origins:*}")
         private String allowedOriginsString;
 
+        @Value("${app.cors.allowed-origin-patterns:}")
+        private String allowedOriginPatternsString;
+
         // ========== Configuration principale ==========
 
         /**
@@ -145,13 +148,21 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
 
-                // Parser la chaîne d'origines autorisées (séparée par des virgules)
+                // Parser listes
                 List<String> allowedOrigins = (allowedOriginsString == null || allowedOriginsString.trim().isEmpty())
                                 ? List.of("*")
                                 : Arrays.stream(allowedOriginsString.split(","))
                                                 .map(String::trim)
                                                 .filter(s -> !s.isEmpty())
                                                 .toList();
+
+                List<String> allowedOriginPatterns = (allowedOriginPatternsString == null
+                                || allowedOriginPatternsString.trim().isEmpty())
+                                                ? List.of()
+                                                : Arrays.stream(allowedOriginPatternsString.split(","))
+                                                                .map(String::trim)
+                                                                .filter(s -> !s.isEmpty())
+                                                                .toList();
 
                 boolean isWildcard = allowedOrigins.contains("*");
 
@@ -160,8 +171,12 @@ public class SecurityConfig {
                         configuration.setAllowedOriginPatterns(List.of("*"));
                         configuration.setAllowCredentials(false);
                 } else {
-                        // Prod: origines explicites, avec credentials (headers cookies/authorization)
-                        configuration.setAllowedOrigins(allowedOrigins);
+                        // Prod: origines explicites et/ou motifs, avec credentials
+                        if (!allowedOriginPatterns.isEmpty()) {
+                                configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+                        } else {
+                                configuration.setAllowedOrigins(allowedOrigins);
+                        }
                         configuration.setAllowCredentials(true);
                 }
 
