@@ -1,0 +1,88 @@
+===============================================
+COMMENT LANCER L'APPLICATION EN MODE DEV
+===============================================
+
+✅ ÉTAPE 1: LANCER LE BACKEND
+-----------------------------
+Depuis le dossier pneumaliback/ :
+
+Option A (Maven) :
+  mvnw spring-boot:run
+
+Option B (IDE - IntelliJ/Eclipse) :
+  Lancer PneumalibackApplication.java
+
+Le backend démarre sur: http://localhost:9999
+Health check: http://localhost:9999/actuator/health
+
+✅ ÉTAPE 2: LANCER LE FRONTEND
+------------------------------
+Depuis le dossier pneumalifront/ :
+
+  npm install  (première fois seulement)
+  npm start
+
+Le frontend démarre sur: http://localhost:4200
+
+✅ ÉTAPE 3: TESTER LA CONNEXION GOOGLE (OPTIONNEL)
+--------------------------------------------------
+IMPORTANT: Ajouter l'URI de redirection localhost dans Google Cloud Console
+
+1. Aller sur: https://console.cloud.google.com/
+2. Sélectionner votre projet
+3. "APIs & Services" > "Credentials"
+4. Cliquer sur votre OAuth 2.0 Client ID
+5. Dans "URIs de redirection autorisées", AJOUTER:
+   http://localhost:9999/api/auth/oauth2/callback/google
+
+6. Dans "Origines JavaScript autorisées", AJOUTER (optionnel):
+   http://localhost:4200
+
+7. Sauvegarder
+
+Maintenant vous pouvez tester "Continuer avec Google" en local !
+
+===============================================
+BASCULER ENTRE DEV ET PROD
+===============================================
+
+MODE DEV (LOCAL):
+  - Backend: mvnw spring-boot:run (port 9999)
+  - Frontend: npm start (port 4200)
+  - Utilise: application-local.properties
+  - Base de données: Neon (prod)
+  - Emails: SendGrid (vrais emails envoyés)
+
+MODE PROD (RENDER):
+  - Backend: Déployé automatiquement sur Render
+  - Frontend: Déployé automatiquement sur Vercel
+  - Utilise: application-render.properties + variables Render
+  - Base de données: Neon (prod)
+  - Emails: SendGrid (vrais emails envoyés)
+
+⚠️  ATTENTION: Vous utilisez la MÊME base de données en dev et prod !
+    Les données créées en local apparaîtront en prod et vice-versa.
+
+===============================================
+TROUBLESHOOTING
+===============================================
+
+❌ Port 9999 déjà utilisé:
+   - Arrêter l'autre processus OU
+   - Changer le port dans application-local.properties:
+     server.port=8080
+
+❌ Erreur de connexion à la base:
+   - Vérifier que les credentials sont corrects
+   - Vérifier votre connexion Internet (DB sur Neon cloud)
+
+❌ Emails non envoyés:
+   - Vérifier SENDGRID_API_KEY
+   - Vérifier les logs pour voir le code de vérification
+
+❌ OAuth Google ne fonctionne pas en local:
+   - Vérifier que http://localhost:9999/api/auth/oauth2/callback/google
+     est bien ajouté dans Google Cloud Console
+
+===============================================
+

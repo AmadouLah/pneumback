@@ -52,18 +52,18 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request, String ip, String userAgent) {
         try {
-            String email = request.email() == null ? "" : request.email().trim();
-            User userForRole = userRepository.findByEmail(email)
+            String normalizedEmail = normalizeEmail(request.email());
+            User userForRole = userRepository.findByEmailIgnoreCase(normalizedEmail)
                     .orElseThrow(() -> new IllegalArgumentException("Identifiants invalides"));
             if (userForRole.getRole() != Role.ADMIN && userForRole.getRole() != Role.DEVELOPER) {
                 throw new RuntimeException(
                         "La connexion par mot de passe est réservée aux administrateurs et développeurs. Utilisez la connexion par e-mail.");
             }
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.password()));
+                    new UsernamePasswordAuthenticationToken(normalizedEmail, request.password()));
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            User user = userRepository.findByEmail(userDetails.getUsername())
+            User user = userRepository.findByEmailIgnoreCase(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             if (requiresCodeVerification(user, ip, userAgent)) {
@@ -132,8 +132,9 @@ public class AuthService {
      */
     @Transactional
     public MessageResponse resendVerificationCode(ResendVerificationRequest request) {
-        // Récupérer l'utilisateur existant (jamais de création)
-        User user = userRepository.findByEmail(request.email())
+        // Récupérer l'utilisateur existant (insensible à la casse)
+        String normalizedEmail = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         // Pour les comptes activés sans code en attente, pas de renvoi possible
@@ -186,8 +187,9 @@ public class AuthService {
      */
     @Transactional
     public void resendVerificationCode(String email) {
-        // Récupérer l'utilisateur existant (jamais de création)
-        User user = userRepository.findByEmail(email)
+        // Récupérer l'utilisateur existant (insensible à la casse)
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         Instant now = Instant.now();
@@ -237,8 +239,9 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse verifyEmail(VerificationRequest request) {
-        // Étape 1 : Récupérer l'utilisateur existant (jamais de création ici)
-        User user = userRepository.findByEmail(request.email())
+        // Étape 1 : Récupérer l'utilisateur existant (insensible à la casse)
+        String normalizedEmail = request.email() == null ? "" : request.email().trim().toLowerCase();
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         // Étape 2 : Vérifier qu'un code a bien été envoyé
@@ -304,7 +307,8 @@ public class AuthService {
     }
 
     private void handleFailedLogin(String email) {
-        userRepository.findByEmail(email).ifPresent(user -> {
+        String normalizedEmail = normalizeEmail(email);
+        userRepository.findByEmailIgnoreCase(normalizedEmail).ifPresent(user -> {
             user.setFailedAttempts(user.getFailedAttempts() + 1);
 
             if (user.getFailedAttempts() >= 5) {
@@ -334,6 +338,14 @@ public class AuthService {
         SecureRandom random = new SecureRandom();
         int number = random.nextInt(1_000_000);
         return String.format("%06d", number);
+    }
+
+    /**
+     * Normalise un email en supprimant les espaces et en convertissant en
+     * minuscules
+     */
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private void sendVerificationCode(User user, boolean isResend) {
@@ -375,8 +387,8 @@ public class AuthService {
         if (normalized.isEmpty())
             throw new RuntimeException("Email requis");
 
-        // Étape 1 : Vérifier si l'utilisateur existe déjà
-        var existingUser = userRepository.findByEmail(normalized);
+        // Étape 1 : Vérifier si l'utilisateur existe déjà (insensible à la casse)
+        var existingUser = userRepository.findByEmailIgnoreCase(normalized);
         boolean isNewUser = existingUser.isEmpty();
 
         User user;
@@ -466,10 +478,10 @@ public class AuthService {
 
     @Transactional
     public StartLoginResponse startLogin(String email) {
-        String normalized = email == null ? "" : email.trim().toLowerCase();
+        String normalized = normalizeEmail(email);
         if (normalized.isEmpty())
             throw new RuntimeException("Email requis");
-        var userOpt = userRepository.findByEmail(normalized);
+        var userOpt = userRepository.findByEmailIgnoreCase(normalized);
         if (userOpt.isPresent()) {
             Role role = userOpt.get().getRole();
             if (role == Role.ADMIN || role == Role.DEVELOPER) {
@@ -482,7 +494,8 @@ public class AuthService {
 
     @Transactional
     public MessageResponse requestPasswordReset(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String normalizedEmail = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         if (!user.isEnabled()) {
@@ -504,7 +517,8 @@ public class AuthService {
             throw new RuntimeException("Les mots de passe ne correspondent pas");
         }
 
-        User user = userRepository.findByEmail(request.email())
+        String normalizedEmail = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         if (!user.isEnabled()) {

@@ -55,8 +55,9 @@ public class OAuth2Service {
         // Étape 2 : Récupérer les informations utilisateur de Google
         Map<String, Object> userInfo = getUserInfoFromGoogle(accessToken);
 
-        // Étape 3 : Extraire les informations
-        String email = (String) userInfo.get("email");
+        // Étape 3 : Extraire et normaliser les informations
+        String rawEmail = (String) userInfo.get("email");
+        String email = rawEmail == null ? null : rawEmail.trim().toLowerCase();
         String firstName = (String) userInfo.get("given_name");
         String lastName = (String) userInfo.get("family_name");
         String googleId = (String) userInfo.get("sub");
@@ -67,8 +68,8 @@ public class OAuth2Service {
 
         log.info("Authentification Google réussie pour: {}", email);
 
-        // Étape 4 : Créer ou récupérer l'utilisateur
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
+        // Étape 4 : Créer ou récupérer l'utilisateur (insensible à la casse)
+        User user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
             log.info("Création d'un nouvel utilisateur via Google OAuth2: {}", email);
             User newUser = User.builder()
                     .email(email)
@@ -87,8 +88,10 @@ public class OAuth2Service {
         });
 
         // Si l'utilisateur existe mais n'a pas de googleId, l'ajouter
+        boolean needsSave = false;
         if (user.getGoogleId() == null) {
             user.setGoogleId(googleId);
+            needsSave = true;
         }
 
         // Mettre à jour les informations si nécessaire
@@ -98,6 +101,12 @@ public class OAuth2Service {
                 user.setFirstName(firstName);
             if (lastName != null)
                 user.setLastName(lastName);
+            needsSave = true;
+        }
+
+        // Sauvegarder les modifications avant d'envoyer le code
+        if (needsSave) {
+            user = userRepository.saveAndFlush(user);
         }
 
         // Étape 5 : Générer et envoyer le code de vérification
