@@ -146,32 +146,39 @@ public class SecurityConfig {
                 CorsConfiguration configuration = new CorsConfiguration();
 
                 // Parser la chaîne d'origines autorisées (séparée par des virgules)
-                List<String> allowedOrigins = allowedOriginsString == null || allowedOriginsString.trim().isEmpty()
+                List<String> allowedOrigins = (allowedOriginsString == null || allowedOriginsString.trim().isEmpty())
                                 ? List.of("*")
-                                : Arrays.asList(allowedOriginsString.split(",")).stream()
+                                : Arrays.stream(allowedOriginsString.split(","))
                                                 .map(String::trim)
                                                 .filter(s -> !s.isEmpty())
                                                 .toList();
 
-                // Déterminer si on utilise le wildcard ou des origines spécifiques
                 boolean isWildcard = allowedOrigins.contains("*");
 
                 if (isWildcard) {
-                        // Mode développement : autoriser toutes les origines SANS credentials
+                        // Dev: toutes origines, pas de credentials
                         configuration.setAllowedOriginPatterns(List.of("*"));
                         configuration.setAllowCredentials(false);
                 } else {
-                        // Mode production : origines spécifiques AVEC credentials
-                        configuration.setAllowedOriginPatterns(allowedOrigins);
+                        // Prod: origines explicites, avec credentials (headers cookies/authorization)
+                        configuration.setAllowedOrigins(allowedOrigins);
                         configuration.setAllowCredentials(true);
                 }
 
                 configuration.setAllowedMethods(Arrays.asList(CORS_METHODS));
-                configuration.setAllowedHeaders(List.of("*"));
-                configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
-                configuration.setMaxAge(3600L); // Cache preflight pour 1 heure
+                configuration.setAllowedHeaders(Arrays.asList(
+                                "Authorization",
+                                "Content-Type",
+                                "X-Requested-With",
+                                "X-Forwarded-For",
+                                "X-Real-IP",
+                                "Accept",
+                                "Origin"));
+                configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+                configuration.setMaxAge(3600L); // Cache preflight 1h
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                // Appliquer sur toute l'API (y compris OPTIONS)
                 source.registerCorsConfiguration("/**", configuration);
                 return source;
         }
