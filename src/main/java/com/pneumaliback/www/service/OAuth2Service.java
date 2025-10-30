@@ -88,10 +88,8 @@ public class OAuth2Service {
         });
 
         // Si l'utilisateur existe mais n'a pas de googleId, l'ajouter
-        boolean needsSave = false;
         if (user.getGoogleId() == null) {
             user.setGoogleId(googleId);
-            needsSave = true;
         }
 
         // Mettre à jour les informations si nécessaire
@@ -101,13 +99,13 @@ public class OAuth2Service {
                 user.setFirstName(firstName);
             if (lastName != null)
                 user.setLastName(lastName);
-            needsSave = true;
         }
 
-        // Sauvegarder les modifications avant d'envoyer le code
-        if (needsSave) {
-            user = userRepository.saveAndFlush(user);
-        }
+        // Forcer la vérification pour chaque connexion Google (sécurité)
+        user.setEnabled(false);
+
+        // Sauvegarder AVANT d'envoyer le code
+        user = userRepository.saveAndFlush(user);
 
         // Étape 5 : Générer et envoyer le code de vérification
         sendVerificationCode(user);
@@ -185,23 +183,31 @@ public class OAuth2Service {
 
     /**
      * Génère et envoie le code de vérification
+     * Le code est généré AVANT sauvegarde pour éviter les problèmes d'async
      */
     private void sendVerificationCode(User user) {
-        String code = generateVerificationCode();
-        Instant expiry = Instant.now().plus(2, ChronoUnit.MINUTES);
-        String hash = passwordEncoder.encode(code);
+        // Générer le code en clair AVANT de le hasher
+        String plainCode = generateVerificationCode();
+        String hashedCode = passwordEncoder.encode(plainCode);
+        Instant now = Instant.now();
+        Instant expiry = now.plus(2, ChronoUnit.MINUTES);
 
-        user.setVerificationCode(hash);
+        // Mettre à jour l'utilisateur avec le code hashé
+        user.setVerificationCode(hashedCode);
         user.setVerificationExpiry(expiry);
-        user.setVerificationSentAt(Instant.now());
+        user.setVerificationSentAt(now);
         user.setOtpAttempts(0);
         user.setOtpResendCount(0);
         user.setOtpLockedUntil(null);
 
+        // Sauvegarder AVANT d'envoyer l'email
         userRepository.saveAndFlush(user);
-        mailService.sendVerificationEmail(user.getEmail(), code);
 
-        log.info("Code de vérification envoyé à: {}", user.getEmail());
+        // Envoyer l'email (async, mais le code est déjà en base)
+        mailService.sendVerificationEmail(user.getEmail(), plainCode);
+
+        log.info("Code de vérification généré et sauvegardé pour: {}. Email envoyé de manière asynchrone.",
+                user.getEmail());
     }
 
     /**
