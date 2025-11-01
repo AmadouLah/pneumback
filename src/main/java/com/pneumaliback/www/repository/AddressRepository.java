@@ -15,38 +15,40 @@ import java.util.Optional;
 
 @Repository
 public interface AddressRepository extends JpaRepository<Address, Long> {
-    
+
     List<Address> findByUser(User user);
-    
+
     List<Address> findByUserOrderByCreatedAtDesc(User user);
-    
+
+    Optional<Address> findFirstByUserAndIsDefaultTrue(User user);
+
     List<Address> findByCountry(Country country);
-    
+
     Page<Address> findByUser(User user, Pageable pageable);
-    
+
     List<Address> findByCity(String city);
-    
+
     List<Address> findByCityAndCountry(String city, Country country);
-    
+
     List<Address> findByRegion(String region);
-    
+
     List<Address> findByPostalCode(String postalCode);
-    
+
     @Query("SELECT a FROM Address a WHERE a.user.id = :userId")
     List<Address> findByUserId(@Param("userId") Long userId);
-    
+
     @Query("SELECT a FROM Address a WHERE a.user.id = :userId ORDER BY a.createdAt DESC")
     Page<Address> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
-    
+
     @Query("SELECT COUNT(a) FROM Address a WHERE a.user = :user")
     Long countByUser(@Param("user") User user);
-    
+
     @Query("SELECT a FROM Address a WHERE a.user = :user AND a.country = :country")
     List<Address> findByUserAndCountry(@Param("user") User user, @Param("country") Country country);
-    
+
     boolean existsByUserAndStreetAndCityAndCountry(User user, String street, String city, Country country);
-    
+
     Optional<Address> findByIdAndUser(Long id, User user);
-    
+
     void deleteByUser(User user);
 }

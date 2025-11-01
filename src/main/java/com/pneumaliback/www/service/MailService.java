@@ -19,8 +19,13 @@ public class MailService {
 
     private final EmailSender emailSender;
 
+    private static final String DEFAULT_CONTACT_EMAIL = "amadoulandoure004@gmail.com";
+
     @Value("${app.admin.emails:}")
     private String adminEmails;
+
+    @Value("${app.contact.email:}")
+    private String contactEmail;
 
     @Async
     public void sendVerificationEmail(String toEmail, String code) {
@@ -124,5 +129,36 @@ public class MailService {
                 + "L'équipe PneuMali";
 
         sendEmailSafely(newEmail, subject, body, "changement email");
+    }
+
+    @Async
+    public void sendContactMessage(String senderName, String senderEmail, String phoneNumber, String message) {
+        String recipients = (contactEmail != null && !contactEmail.isBlank())
+                ? contactEmail
+                : (adminEmails != null && !adminEmails.isBlank() ? adminEmails : DEFAULT_CONTACT_EMAIL);
+
+        if (recipients == null || recipients.isBlank()) {
+            log.warn("Aucun destinataire configuré pour les messages de contact, utilisation annulée");
+            return;
+        }
+
+        String subject = "Nouvelle demande de contact - PneuMali";
+        StringBuilder body = new StringBuilder()
+                .append("Bonjour,\n\n")
+                .append("Une nouvelle demande a été envoyée depuis le site PneuMali.\n\n")
+                .append("Nom: ").append(senderName != null ? senderName : "Inconnu").append("\n")
+                .append("Email: ").append(senderEmail != null ? senderEmail : "Non fourni").append("\n")
+                .append("Téléphone: ")
+                .append(phoneNumber != null && !phoneNumber.isBlank() ? phoneNumber : "Non communiqué").append("\n\n")
+                .append("Message:\n")
+                .append(message != null ? message : "(aucun message)").append("\n\n")
+                .append("— Message généré automatiquement —");
+
+        for (String to : recipients.split(",")) {
+            String target = to.trim();
+            if (!target.isEmpty()) {
+                sendEmailSafely(target, subject, body.toString(), "contact");
+            }
+        }
     }
 }

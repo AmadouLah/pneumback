@@ -1,7 +1,9 @@
 package com.pneumaliback.www.service;
 
 import com.pneumaliback.www.dto.UpdateProfileRequest;
+import com.pneumaliback.www.entity.Address;
 import com.pneumaliback.www.entity.User;
+import com.pneumaliback.www.repository.AddressRepository;
 import com.pneumaliback.www.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +20,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final MailService mailService;
     private final PasswordEncoder passwordEncoder;
+    private final AddressRepository addressRepository;
 
     /**
      * Met à jour le profil de l'utilisateur et retourne l'utilisateur modifié
@@ -47,7 +50,7 @@ public class UserService {
         }
 
         // Récupérer le compte existant (jamais de création)
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailIgnoreCase(email.trim())
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
 
         // Mise à jour du prénom (accepte les valeurs vides pour permettre de vider le
@@ -60,6 +63,11 @@ public class UserService {
         // champ)
         if (request.getLastName() != null) {
             user.setLastName(request.getLastName().trim());
+        }
+
+        if (request.getPhoneNumber() != null) {
+            String phone = request.getPhoneNumber().trim();
+            user.setPhoneNumber(phone.isEmpty() ? null : phone);
         }
 
         // Mise à jour de l'email si fourni et différent
@@ -97,6 +105,25 @@ public class UserService {
 
         // Sauvegarder les modifications du compte existant
         return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public User getProfile(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email utilisateur requis");
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
+
+        if (user.getPhoneNumber() == null || user.getPhoneNumber().isBlank()) {
+            addressRepository.findFirstByUserAndIsDefaultTrue(user)
+                    .map(Address::getPhoneNumber)
+                    .filter(phone -> phone != null && !phone.isBlank())
+                    .ifPresent(user::setPhoneNumber);
+        }
+
+        return user;
     }
 
     /**

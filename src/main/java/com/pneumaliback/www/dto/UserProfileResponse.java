@@ -1,15 +1,16 @@
 package com.pneumaliback.www.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
+@Builder
 @AllArgsConstructor
-public class UpdateProfileRequest {
+public class UserProfileResponse {
+    private Long id;
+    private String email;
     private String firstName;
     private String lastName;
-    private String email;
     private String phoneNumber;
 }
