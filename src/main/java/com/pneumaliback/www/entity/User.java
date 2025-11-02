@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.pneumaliback.www.enums.AuthProvider;
 import com.pneumaliback.www.enums.Country;
+import com.pneumaliback.www.enums.Gender;
 import com.pneumaliback.www.enums.Role;
 
 @Entity
@@ -45,6 +46,10 @@ public class User extends EntiteAuditable implements UserDetails {
 
     @Column(length = 20)
     private String phoneNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private Gender gender;
 
     @Enumerated(EnumType.STRING)
     @Column

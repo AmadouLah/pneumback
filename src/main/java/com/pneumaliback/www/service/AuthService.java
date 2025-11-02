@@ -331,7 +331,8 @@ public class AuthService {
                         user.getEmail(),
                         user.getFirstName(),
                         user.getLastName(),
-                        user.getRole().name()));
+                        user.getRole().name(),
+                        user.getGender() != null ? user.getGender().name() : null));
     }
 
     private String generateVerificationCode() {
@@ -702,6 +703,7 @@ public class AuthService {
                         user.getEmail(),
                         user.getFirstName(),
                         user.getLastName(),
-                        user.getRole().name()));
+                        user.getRole().name(),
+                        user.getGender() != null ? user.getGender().name() : null));
     }
 }

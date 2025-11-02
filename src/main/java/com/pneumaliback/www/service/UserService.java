@@ -1,5 +1,6 @@
 package com.pneumaliback.www.service;
 
+import com.pneumaliback.www.dto.UpdateGenderRequest;
 import com.pneumaliback.www.dto.UpdateProfileRequest;
 import com.pneumaliback.www.entity.Address;
 import com.pneumaliback.www.entity.User;
@@ -124,6 +125,26 @@ public class UserService {
         }
 
         return user;
+    }
+
+    /**
+     * Met à jour le genre de l'utilisateur
+     */
+    @Transactional
+    public User updateGender(String email, UpdateGenderRequest request) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email utilisateur requis");
+        }
+
+        if (request == null || request.getGender() == null) {
+            throw new IllegalArgumentException("Genre requis");
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
+
+        user.setGender(request.getGender());
+        return userRepository.save(user);
     }
 
     /**

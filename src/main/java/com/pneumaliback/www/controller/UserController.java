@@ -1,9 +1,11 @@
 package com.pneumaliback.www.controller;
 
+import com.pneumaliback.www.dto.UpdateGenderRequest;
 import com.pneumaliback.www.dto.UpdateProfileRequest;
 import com.pneumaliback.www.dto.UserProfileResponse;
 import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -64,6 +66,26 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Erreur lors de la récupération du profil"));
+        }
+    }
+
+    /**
+     * Mise à jour du genre de l'utilisateur
+     */
+    @PutMapping("/gender")
+    public ResponseEntity<?> updateGender(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody UpdateGenderRequest request) {
+        try {
+            User updatedUser = userService.updateGender(userDetails.getUsername(), request);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Genre mis à jour avec succès",
+                    "gender", updatedUser.getGender() != null ? updatedUser.getGender().name() : null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Erreur lors de la mise à jour du genre"));
         }
     }
 }
