@@ -75,6 +75,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
        @Query("SELECT u.role, COUNT(u) FROM User u GROUP BY u.role")
        List<Object[]> countUsersByRole();
 
+       // === Statistiques par genre ===
+       @Query("SELECT u.gender, COUNT(u) FROM User u WHERE u.gender IS NOT NULL GROUP BY u.gender")
+       List<Object[]> countUsersByGender();
+
+       @Query("SELECT COUNT(u) FROM User u WHERE u.gender = :gender")
+       long countByGender(@Param("gender") com.pneumaliback.www.enums.Gender gender);
+
        // === Statistiques par pays ===
        @Query("SELECT u.country, COUNT(u) FROM User u GROUP BY u.country ORDER BY COUNT(u) DESC")
        List<Object[]> countUsersByCountry();

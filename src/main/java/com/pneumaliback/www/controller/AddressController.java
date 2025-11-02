@@ -40,6 +40,23 @@ public class AddressController {
                 .body(java.util.Map.of("error", "Erreur interne du serveur", "message", msg));
     }
 
+    /**
+     * Synchronise le numéro de téléphone de l'adresse par défaut avec
+     * User.phoneNumber
+     * 
+     * @param user        L'utilisateur à mettre à jour
+     * @param phoneNumber Le numéro de téléphone à synchroniser
+     */
+    private void syncPhoneNumberToUser(User user, String phoneNumber) {
+        if (user == null || phoneNumber == null || phoneNumber.isBlank()) {
+            return;
+        }
+
+        user.setPhoneNumber(phoneNumber.trim());
+        userRepository.save(user);
+        log.info("Numéro de téléphone synchronisé pour l'utilisateur {}: {}", user.getEmail(), phoneNumber);
+    }
+
     @PostMapping
     @Transactional
     @Operation(summary = "Ajouter une adresse", description = "Permet à un utilisateur d'ajouter une nouvelle adresse")
@@ -47,7 +64,7 @@ public class AddressController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody AddAddressRequest request) {
         try {
-            User user = userRepository.findByEmail(userDetails.getUsername())
+            User user = userRepository.findByEmailIgnoreCase(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             // Si cette adresse est définie comme adresse par défaut, désactiver les autres
@@ -69,6 +86,11 @@ public class AddressController {
 
             addressRepository.save(address);
 
+            // Synchroniser le numéro de téléphone avec User si cette adresse est par défaut
+            if (request.isDefault() && request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
+                syncPhoneNumberToUser(user, request.phoneNumber());
+            }
+
             return ResponseEntity.ok(java.util.Map.of("message", "Adresse ajoutée avec succès"));
         } catch (Exception e) {
             log.error("Erreur lors de l'ajout de l'adresse pour l'utilisateur {}: {}", userDetails.getUsername(),
@@ -81,7 +103,7 @@ public class AddressController {
     @Operation(summary = "Obtenir les adresses de l'utilisateur", description = "Récupère toutes les adresses de l'utilisateur connecté")
     public ResponseEntity<?> getUserAddresses(@AuthenticationPrincipal UserDetails userDetails) {
         try {
-            User user = userRepository.findByEmail(userDetails.getUsername())
+            User user = userRepository.findByEmailIgnoreCase(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             List<Address> addresses = addressRepository.findByUser(user);
@@ -101,7 +123,7 @@ public class AddressController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateAddressRequest request) {
         try {
-            User user = userRepository.findByEmail(userDetails.getUsername())
+            User user = userRepository.findByEmailIgnoreCase(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             Address address = addressRepository.findById(id)
@@ -131,9 +153,13 @@ public class AddressController {
             if (request.phoneNumber() != null) {
                 address.setPhoneNumber(request.phoneNumber());
             }
+
+            boolean wasDefault = address.isDefault();
+            boolean becomesDefault = request.isDefault() != null && request.isDefault();
+
             if (request.isDefault() != null) {
                 // Si cette adresse devient la par défaut, désactiver les autres
-                if (request.isDefault()) {
+                if (becomesDefault) {
                     List<Address> userAddresses = addressRepository.findByUser(user);
                     userAddresses.forEach(addr -> addr.setDefault(false));
                     addressRepository.saveAll(userAddresses);
@@ -142,6 +168,13 @@ public class AddressController {
             }
 
             addressRepository.save(address);
+
+            // Synchroniser le numéro de téléphone avec User si l'adresse est par défaut
+            boolean isDefaultAfterUpdate = request.isDefault() != null ? request.isDefault() : wasDefault;
+
+            if (isDefaultAfterUpdate && address.getPhoneNumber() != null && !address.getPhoneNumber().isBlank()) {
+                syncPhoneNumberToUser(user, address.getPhoneNumber());
+            }
 
             return ResponseEntity.ok(java.util.Map.of(
                     "message", "Adresse mise à jour avec succès",
@@ -160,7 +193,7 @@ public class AddressController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id) {
         try {
-            User user = userRepository.findByEmail(userDetails.getUsername())
+            User user = userRepository.findByEmailIgnoreCase(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             Address address = addressRepository.findById(id)

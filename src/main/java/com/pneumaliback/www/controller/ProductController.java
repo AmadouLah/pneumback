@@ -1,5 +1,7 @@
 package com.pneumaliback.www.controller;
 
+import com.pneumaliback.www.dto.CreateProductRequest;
+import com.pneumaliback.www.dto.UpdateProductRequest;
 import com.pneumaliback.www.entity.Category;
 import com.pneumaliback.www.entity.Product;
 import com.pneumaliback.www.repository.CategoryRepository;
@@ -10,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +39,8 @@ public class ProductController {
             }
             return ResponseEntity.badRequest().body(java.util.Map.of("error", msg));
         }
-        return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
+        return ResponseEntity.internalServerError()
+                .body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
     }
 
     @GetMapping("/active")
@@ -77,19 +81,50 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> filter(@RequestParam(required = false) Long categoryId,
-                                                @RequestParam(required = false) String brand,
-                                                @RequestParam(required = false) String size,
-                                                @RequestParam(required = false) String season,
-                                                @RequestParam(required = false) BigDecimal minPrice,
-                                                @RequestParam(required = false) BigDecimal maxPrice,
-                                                Pageable pageable) {
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String size,
+            @RequestParam(required = false) String season,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            Pageable pageable) {
         try {
             Category category = null;
             if (categoryId != null) {
                 category = categoryRepository.findById(categoryId)
                         .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
             }
-            return ResponseEntity.ok(productService.findWithFilters(category, brand, size, season, minPrice, maxPrice, pageable));
+            return ResponseEntity
+                    .ok(productService.findWithFilters(category, brand, size, season, minPrice, maxPrice, pageable));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @GetMapping
+    @Operation(summary = "Lister tous les produits (admin)", description = "Liste tous les produits, y compris inactifs")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Liste récupérée"),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> listAll(Pageable pageable) {
+        try {
+            return ResponseEntity.ok(productService.listAll(pageable));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Récupérer un produit par ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produit trouvé"),
+            @ApiResponse(responseCode = "404", description = "Produit introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(productService.findById(id));
         } catch (Exception e) {
             return handleException(e);
         }
@@ -103,9 +138,45 @@ public class ProductController {
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
-    public ResponseEntity<?> create(@RequestBody Product product) {
+    public ResponseEntity<?> create(@Valid @RequestBody CreateProductRequest request) {
         try {
-            return ResponseEntity.ok(productService.save(product));
+            Product product = productService.createFromRequest(request);
+            return ResponseEntity.ok(product);
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Mettre à jour un produit")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produit mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Product.class))),
+            @ApiResponse(responseCode = "404", description = "Produit introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody UpdateProductRequest request) {
+        try {
+            Product product = productService.updateFromRequest(id, request);
+            return ResponseEntity.ok(product);
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Supprimer un produit")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produit supprimé"),
+            @ApiResponse(responseCode = "404", description = "Produit introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        try {
+            productService.delete(id);
+            return ResponseEntity.ok(java.util.Map.of("message", "Produit supprimé avec succès"));
         } catch (Exception e) {
             return handleException(e);
         }
@@ -147,9 +218,9 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> byDimensions(@RequestParam(required = false) String width,
-                                          @RequestParam(required = false) String profile,
-                                          @RequestParam(required = false) String diameter,
-                                          Pageable pageable) {
+            @RequestParam(required = false) String profile,
+            @RequestParam(required = false) String diameter,
+            Pageable pageable) {
         try {
             return ResponseEntity.ok(productService.findByDimensions(width, profile, diameter, pageable));
         } catch (Exception e) {
@@ -157,4 +228,3 @@ public class ProductController {
         }
     }
 }
-

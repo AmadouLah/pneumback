@@ -1,6 +1,8 @@
 package com.pneumaliback.www.controller;
 
 import com.pneumaliback.www.entity.User;
+import com.pneumaliback.www.enums.Country;
+import com.pneumaliback.www.enums.Gender;
 import com.pneumaliback.www.enums.Role;
 import com.pneumaliback.www.repository.UserRepository;
 import com.pneumaliback.www.entity.Order;
@@ -52,7 +54,8 @@ public class AdminController {
             }
             return ResponseEntity.badRequest().body(Map.of("error", msg));
         }
-        return ResponseEntity.internalServerError().body(Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
+        return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
     }
 
     @GetMapping("/users")
@@ -221,6 +224,108 @@ public class AdminController {
             long lockedUsers) {
     }
 
+    @GetMapping("/stats/customers-gender")
+    @Operation(summary = "Statistiques clients par genre", description = "Récupère le nombre de clients par genre")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Statistiques récupérées"),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getCustomerGenderStats() {
+        try {
+            log.info("Récupération des statistiques clients par genre");
+
+            long maleCount = userRepository.countByGender(Gender.HOMME);
+            long femaleCount = userRepository.countByGender(Gender.FEMME);
+            long otherCount = userRepository.countByGender(Gender.AUTRE);
+
+            CustomerGenderStats stats = new CustomerGenderStats(maleCount, femaleCount, otherCount);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques clients par genre", e);
+            return handleException(e);
+        }
+    }
+
+    public record CustomerGenderStats(
+            long male,
+            long female,
+            long other) {
+    }
+
+    @GetMapping("/stats/distribution")
+    @Operation(summary = "Statistiques de distribution géographique", description = "Récupère la distribution des utilisateurs par région géographique")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Statistiques récupérées"),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getDistributionStats() {
+        try {
+            log.info("Récupération des statistiques de distribution géographique");
+
+            List<Object[]> countryCounts = userRepository.countUsersByCountry();
+            long totalUsers = userRepository.count();
+
+            long africa = 0;
+            long america = 0;
+            long europe = 0;
+            long others = 0;
+
+            for (Object[] row : countryCounts) {
+                Country country = (Country) row[0];
+                Long count = ((Number) row[1]).longValue();
+                String region = getRegionFromCountry(country);
+
+                switch (region) {
+                    case "AFRICA" -> africa += count;
+                    case "AMERICA" -> america += count;
+                    case "EUROPE" -> europe += count;
+                    default -> others += count;
+                }
+            }
+
+            // Calculer les pourcentages
+            double africaPercent = totalUsers > 0 ? (africa * 100.0 / totalUsers) : 0;
+            double americaPercent = totalUsers > 0 ? (america * 100.0 / totalUsers) : 0;
+            double europePercent = totalUsers > 0 ? (europe * 100.0 / totalUsers) : 0;
+            double othersPercent = totalUsers > 0 ? (others * 100.0 / totalUsers) : 0;
+
+            DistributionStats stats = new DistributionStats(
+                    Math.round(africaPercent),
+                    Math.round(americaPercent),
+                    Math.round(europePercent),
+                    Math.round(othersPercent));
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques de distribution", e);
+            return handleException(e);
+        }
+    }
+
+    /**
+     * Détermine la région géographique d'un pays
+     * 
+     * @param country Le pays
+     * @return La région (AFRICA, AMERICA, EUROPE, ou OTHER)
+     */
+    private String getRegionFromCountry(Country country) {
+        if (country == null) {
+            return "OTHER";
+        }
+
+        return switch (country) {
+            // Pays africains
+            case MALI, MOROCCO, BURKINA_FASO, SENEGAL, IVORY_COAST -> "AFRICA";
+        };
+    }
+
+    public record DistributionStats(
+            long africa,
+            long america,
+            long europe,
+            long others) {
+    }
+
     @PutMapping("/orders/{orderId}/confirm")
     @Operation(summary = "Confirmer une commande")
     @ApiResponses(value = {
@@ -231,7 +336,8 @@ public class AdminController {
     public ResponseEntity<?> confirmOrder(@PathVariable Long orderId) {
         try {
             Optional<Order> opt = orderRepository.findById(orderId);
-            if (opt.isEmpty()) return ResponseEntity.status(404).body(Map.of("error", "Commande non trouvée"));
+            if (opt.isEmpty())
+                return ResponseEntity.status(404).body(Map.of("error", "Commande non trouvée"));
             Order order = opt.get();
             orderService.confirm(order);
             Order saved = orderRepository.save(order);
@@ -279,7 +385,8 @@ public class AdminController {
         try {
             BigDecimal total = commissionRepository.sumByInfluenceur(influenceurId);
             BigDecimal paid = commissionRepository.sumByInfluenceurAndStatus(influenceurId, CommissionStatus.PAID);
-            BigDecimal pending = commissionRepository.sumByInfluenceurAndStatus(influenceurId, CommissionStatus.PENDING);
+            BigDecimal pending = commissionRepository.sumByInfluenceurAndStatus(influenceurId,
+                    CommissionStatus.PENDING);
             return ResponseEntity.ok(new BalanceDTO(total, paid, pending));
         } catch (Exception e) {
             return handleException(e);
@@ -296,7 +403,8 @@ public class AdminController {
     public ResponseEntity<?> payCommission(@PathVariable Long commissionId) {
         try {
             Optional<Commission> opt = commissionRepository.findById(commissionId);
-            if (opt.isEmpty()) return ResponseEntity.status(404).body(Map.of("error", "Commission non trouvée"));
+            if (opt.isEmpty())
+                return ResponseEntity.status(404).body(Map.of("error", "Commission non trouvée"));
             Commission c = opt.get();
             commissionService.markPaid(c);
             return ResponseEntity.ok(c);
@@ -305,5 +413,6 @@ public class AdminController {
         }
     }
 
-    public record BalanceDTO(BigDecimal total, BigDecimal paid, BigDecimal pending) {}
+    public record BalanceDTO(BigDecimal total, BigDecimal paid, BigDecimal pending) {
+    }
 }
