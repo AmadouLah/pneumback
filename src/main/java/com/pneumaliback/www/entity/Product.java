@@ -32,11 +32,20 @@ public class Product extends EntiteAuditable {
     @Column(nullable = false)
     private int stock;
 
-    @Column(length = 50)
-    private String brand;
+    @ManyToOne
+    private Brand brand;
 
     @Column(length = 50)
     private String size;
+
+    @ManyToOne
+    private TireWidth width;
+
+    @ManyToOne
+    private TireProfile profile;
+
+    @ManyToOne
+    private TireDiameter diameter;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)

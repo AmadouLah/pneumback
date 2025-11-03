@@ -4,7 +4,9 @@ import com.pneumaliback.www.dto.CreateProductRequest;
 import com.pneumaliback.www.dto.UpdateProductRequest;
 import com.pneumaliback.www.entity.Category;
 import com.pneumaliback.www.entity.Product;
+import com.pneumaliback.www.entity.Brand;
 import com.pneumaliback.www.repository.CategoryRepository;
+import com.pneumaliback.www.repository.BrandRepository;
 import com.pneumaliback.www.service.ProductService;
 import com.pneumaliback.www.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +34,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
     private final StorageService storageService;
 
     private ResponseEntity<?> handleException(Exception e) {
@@ -84,7 +87,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> filter(@RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Long brandId,
             @RequestParam(required = false) String size,
             @RequestParam(required = false) String season,
             @RequestParam(required = false) BigDecimal minPrice,
@@ -95,6 +98,11 @@ public class ProductController {
             if (categoryId != null) {
                 category = categoryRepository.findById(categoryId)
                         .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
+            }
+            Brand brand = null;
+            if (brandId != null) {
+                brand = brandRepository.findById(brandId)
+                        .orElseThrow(() -> new IllegalArgumentException("Marque introuvable"));
             }
             return ResponseEntity
                     .ok(productService.findWithFilters(category, brand, size, season, minPrice, maxPrice, pageable));
@@ -146,8 +154,11 @@ public class ProductController {
             @RequestParam("name") String name,
             @RequestParam("price") String priceStr,
             @RequestParam("stock") String stockStr,
-            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "brandId", required = false) String brandIdStr,
             @RequestParam(value = "size", required = false) String size,
+            @RequestParam(value = "widthId", required = false) String widthIdStr,
+            @RequestParam(value = "profileId", required = false) String profileIdStr,
+            @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
             @RequestParam(value = "vehicleType", required = false) String vehicleType,
             @RequestParam(value = "description", required = false) String description,
@@ -164,8 +175,13 @@ public class ProductController {
             Long categoryId = Long.parseLong(categoryIdStr);
             Boolean active = "true".equalsIgnoreCase(activeStr);
 
+            Long brandId = brandIdStr != null && !brandIdStr.isBlank() ? Long.parseLong(brandIdStr) : null;
+            Long widthId = widthIdStr != null && !widthIdStr.isBlank() ? Long.parseLong(widthIdStr) : null;
+            Long profileId = profileIdStr != null && !profileIdStr.isBlank() ? Long.parseLong(profileIdStr) : null;
+            Long diameterId = diameterIdStr != null && !diameterIdStr.isBlank() ? Long.parseLong(diameterIdStr) : null;
+
             CreateProductRequest request = new CreateProductRequest(
-                    name, price, stock, brand, size,
+                    name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
                     vehicleType != null && !vehicleType.isBlank()
                             ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)
@@ -200,8 +216,11 @@ public class ProductController {
             @RequestParam(value = "name", required = false) String name,
             @RequestParam(value = "price", required = false) String priceStr,
             @RequestParam(value = "stock", required = false) String stockStr,
-            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "brandId", required = false) String brandIdStr,
             @RequestParam(value = "size", required = false) String size,
+            @RequestParam(value = "widthId", required = false) String widthIdStr,
+            @RequestParam(value = "profileId", required = false) String profileIdStr,
+            @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
             @RequestParam(value = "vehicleType", required = false) String vehicleType,
             @RequestParam(value = "description", required = false) String description,
@@ -225,8 +244,13 @@ public class ProductController {
             Long categoryId = categoryIdStr != null && !categoryIdStr.isBlank() ? Long.parseLong(categoryIdStr) : null;
             Boolean active = activeStr != null && !activeStr.isBlank() ? "true".equalsIgnoreCase(activeStr) : null;
 
+            Long brandId = brandIdStr != null && !brandIdStr.isBlank() ? Long.parseLong(brandIdStr) : null;
+            Long widthId = widthIdStr != null && !widthIdStr.isBlank() ? Long.parseLong(widthIdStr) : null;
+            Long profileId = profileIdStr != null && !profileIdStr.isBlank() ? Long.parseLong(profileIdStr) : null;
+            Long diameterId = diameterIdStr != null && !diameterIdStr.isBlank() ? Long.parseLong(diameterIdStr) : null;
+
             UpdateProductRequest request = new UpdateProductRequest(
-                    name, price, stock, brand, size,
+                    name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
                     vehicleType != null && !vehicleType.isBlank()
                             ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)

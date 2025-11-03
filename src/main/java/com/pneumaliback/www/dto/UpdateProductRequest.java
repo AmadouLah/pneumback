@@ -15,9 +15,15 @@ public record UpdateProductRequest(
 
         @Min(value = 0, message = "Le stock ne peut pas être négatif") Integer stock,
 
-        @Size(max = 50, message = "La marque ne peut pas dépasser 50 caractères") String brand,
+        Long brandId,
 
         @Size(max = 50, message = "La taille ne peut pas dépasser 50 caractères") String size,
+
+        Long widthId,
+
+        Long profileId,
+
+        Long diameterId,
 
         TireSeason season,
 
