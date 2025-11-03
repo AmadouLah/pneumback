@@ -14,6 +14,7 @@ import com.pneumaliback.www.repository.BrandRepository;
 import com.pneumaliback.www.repository.TireWidthRepository;
 import com.pneumaliback.www.repository.TireProfileRepository;
 import com.pneumaliback.www.repository.TireDiameterRepository;
+import com.pneumaliback.www.repository.CartItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,7 @@ public class ProductService {
     private final TireWidthRepository tireWidthRepository;
     private final TireProfileRepository tireProfileRepository;
     private final TireDiameterRepository tireDiameterRepository;
+    private final CartItemRepository cartItemRepository;
 
     public Page<Product> listActive(Pageable pageable) {
         return productRepository.findByActiveTrue(pageable);
@@ -221,6 +223,8 @@ public class ProductService {
     @Transactional
     public void delete(Long id) {
         Product product = findById(id);
+        // Supprimer tous les CartItem qui référencent ce produit
+        cartItemRepository.deleteByProductId(id);
         productRepository.delete(product);
     }
 }
