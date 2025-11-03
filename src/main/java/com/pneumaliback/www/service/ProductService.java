@@ -8,12 +8,14 @@ import com.pneumaliback.www.entity.Brand;
 import com.pneumaliback.www.entity.TireWidth;
 import com.pneumaliback.www.entity.TireProfile;
 import com.pneumaliback.www.entity.TireDiameter;
+import com.pneumaliback.www.entity.VehicleType;
 import com.pneumaliback.www.repository.CategoryRepository;
 import com.pneumaliback.www.repository.ProductRepository;
 import com.pneumaliback.www.repository.BrandRepository;
 import com.pneumaliback.www.repository.TireWidthRepository;
 import com.pneumaliback.www.repository.TireProfileRepository;
 import com.pneumaliback.www.repository.TireDiameterRepository;
+import com.pneumaliback.www.repository.VehicleTypeRepository;
 import com.pneumaliback.www.repository.CartItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +36,7 @@ public class ProductService {
     private final TireWidthRepository tireWidthRepository;
     private final TireProfileRepository tireProfileRepository;
     private final TireDiameterRepository tireDiameterRepository;
+    private final VehicleTypeRepository vehicleTypeRepository;
     private final CartItemRepository cartItemRepository;
 
     public Page<Product> listActive(Pageable pageable) {
@@ -144,8 +147,13 @@ public class ProductService {
             product.setDiameter(diameter);
         }
 
+        if (request.vehicleTypeId() != null) {
+            VehicleType vehicleType = vehicleTypeRepository.findById(request.vehicleTypeId())
+                    .orElseThrow(() -> new IllegalArgumentException("Type de véhicule introuvable"));
+            product.setVehicleType(vehicleType);
+        }
+
         product.setSeason(request.season());
-        product.setVehicleType(request.vehicleType());
         product.setImageUrl(request.imageUrl());
         product.setDescription(request.description());
         product.setCategory(category);
@@ -199,8 +207,10 @@ public class ProductService {
         if (request.season() != null) {
             product.setSeason(request.season());
         }
-        if (request.vehicleType() != null) {
-            product.setVehicleType(request.vehicleType());
+        if (request.vehicleTypeId() != null) {
+            VehicleType vehicleType = vehicleTypeRepository.findById(request.vehicleTypeId())
+                    .orElseThrow(() -> new IllegalArgumentException("Type de véhicule introuvable"));
+            product.setVehicleType(vehicleType);
         }
         if (request.imageUrl() != null) {
             product.setImageUrl(request.imageUrl());

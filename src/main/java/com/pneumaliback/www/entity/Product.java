@@ -6,7 +6,6 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.pneumaliback.www.enums.TireSeason;
-import com.pneumaliback.www.enums.VehicleType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,8 +50,7 @@ public class Product extends EntiteAuditable {
     @Column(length = 20)
     private TireSeason season;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @ManyToOne
     private VehicleType vehicleType;
 
     @Column(length = 255)

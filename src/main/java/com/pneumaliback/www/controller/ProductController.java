@@ -160,7 +160,7 @@ public class ProductController {
             @RequestParam(value = "profileId", required = false) String profileIdStr,
             @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
-            @RequestParam(value = "vehicleType", required = false) String vehicleType,
+            @RequestParam(value = "vehicleTypeId", required = false) String vehicleTypeIdStr,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("categoryId") String categoryIdStr,
             @RequestParam(value = "active", defaultValue = "true") String activeStr) {
@@ -179,13 +179,14 @@ public class ProductController {
             Long widthId = widthIdStr != null && !widthIdStr.isBlank() ? Long.parseLong(widthIdStr) : null;
             Long profileId = profileIdStr != null && !profileIdStr.isBlank() ? Long.parseLong(profileIdStr) : null;
             Long diameterId = diameterIdStr != null && !diameterIdStr.isBlank() ? Long.parseLong(diameterIdStr) : null;
+            Long vehicleTypeId = vehicleTypeIdStr != null && !vehicleTypeIdStr.isBlank()
+                    ? Long.parseLong(vehicleTypeIdStr)
+                    : null;
 
             CreateProductRequest request = new CreateProductRequest(
                     name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
-                    vehicleType != null && !vehicleType.isBlank()
-                            ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)
-                            : null,
+                    vehicleTypeId,
                     imageUrl, description, categoryId, active);
 
             Product product = productService.createFromRequest(request);
@@ -222,7 +223,7 @@ public class ProductController {
             @RequestParam(value = "profileId", required = false) String profileIdStr,
             @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
-            @RequestParam(value = "vehicleType", required = false) String vehicleType,
+            @RequestParam(value = "vehicleTypeId", required = false) String vehicleTypeIdStr,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "categoryId", required = false) String categoryIdStr,
             @RequestParam(value = "active", required = false) String activeStr) {
@@ -248,13 +249,14 @@ public class ProductController {
             Long widthId = widthIdStr != null && !widthIdStr.isBlank() ? Long.parseLong(widthIdStr) : null;
             Long profileId = profileIdStr != null && !profileIdStr.isBlank() ? Long.parseLong(profileIdStr) : null;
             Long diameterId = diameterIdStr != null && !diameterIdStr.isBlank() ? Long.parseLong(diameterIdStr) : null;
+            Long vehicleTypeId = vehicleTypeIdStr != null && !vehicleTypeIdStr.isBlank()
+                    ? Long.parseLong(vehicleTypeIdStr)
+                    : null;
 
             UpdateProductRequest request = new UpdateProductRequest(
                     name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
-                    vehicleType != null && !vehicleType.isBlank()
-                            ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)
-                            : null,
+                    vehicleTypeId,
                     imageUrl, description, categoryId, active);
 
             Product product = productService.updateFromRequest(id, request);

@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
 @Slf4j
 public class MailConfig {
 
-    @Value("${app.mail.from:noreply@pneumali.ml}")
+    @Value("${app.mail.from:amadoulandoure004@gmail.com}")
     private String fromAddress;
 
     /**
