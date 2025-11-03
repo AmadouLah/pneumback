@@ -6,20 +6,22 @@ import com.pneumaliback.www.entity.Category;
 import com.pneumaliback.www.entity.Product;
 import com.pneumaliback.www.repository.CategoryRepository;
 import com.pneumaliback.www.service.ProductService;
+import com.pneumaliback.www.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/products")
@@ -30,6 +32,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final CategoryRepository categoryRepository;
+    private final StorageService storageService;
 
     private ResponseEntity<?> handleException(Exception e) {
         if (e instanceof IllegalArgumentException) {
@@ -138,10 +141,45 @@ public class ProductController {
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
-    public ResponseEntity<?> create(@Valid @RequestBody CreateProductRequest request) {
+    public ResponseEntity<?> create(
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam("name") String name,
+            @RequestParam("price") String priceStr,
+            @RequestParam("stock") String stockStr,
+            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "size", required = false) String size,
+            @RequestParam(value = "season", required = false) String season,
+            @RequestParam(value = "vehicleType", required = false) String vehicleType,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("categoryId") String categoryIdStr,
+            @RequestParam(value = "active", defaultValue = "true") String activeStr) {
         try {
+            String imageUrl = null;
+            if (image != null && !image.isEmpty()) {
+                imageUrl = storageService.uploadFile(image, "products");
+            }
+
+            BigDecimal price = new BigDecimal(priceStr);
+            Integer stock = Integer.parseInt(stockStr);
+            Long categoryId = Long.parseLong(categoryIdStr);
+            Boolean active = "true".equalsIgnoreCase(activeStr);
+
+            CreateProductRequest request = new CreateProductRequest(
+                    name, price, stock, brand, size,
+                    season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
+                    vehicleType != null && !vehicleType.isBlank()
+                            ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)
+                            : null,
+                    imageUrl, description, categoryId, active);
+
             Product product = productService.createFromRequest(request);
             return ResponseEntity.ok(product);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", "Format numérique invalide"));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", "Erreur lors de l'upload de l'image: " + e.getMessage()));
         } catch (Exception e) {
             return handleException(e);
         }
@@ -156,10 +194,53 @@ public class ProductController {
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
-    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody UpdateProductRequest request) {
+    public ResponseEntity<?> update(
+            @PathVariable Long id,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "price", required = false) String priceStr,
+            @RequestParam(value = "stock", required = false) String stockStr,
+            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "size", required = false) String size,
+            @RequestParam(value = "season", required = false) String season,
+            @RequestParam(value = "vehicleType", required = false) String vehicleType,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "categoryId", required = false) String categoryIdStr,
+            @RequestParam(value = "active", required = false) String activeStr) {
         try {
+            String imageUrl = null;
+            if (image != null && !image.isEmpty()) {
+                Product existingProduct = productService.findById(id);
+                if (existingProduct.getImageUrl() != null && !existingProduct.getImageUrl().isBlank()) {
+                    String oldFilePath = storageService.extractFilePathFromUrl(existingProduct.getImageUrl());
+                    if (oldFilePath != null) {
+                        storageService.deleteFile(oldFilePath);
+                    }
+                }
+                imageUrl = storageService.uploadFile(image, "products");
+            }
+
+            BigDecimal price = priceStr != null && !priceStr.isBlank() ? new BigDecimal(priceStr) : null;
+            Integer stock = stockStr != null && !stockStr.isBlank() ? Integer.parseInt(stockStr) : null;
+            Long categoryId = categoryIdStr != null && !categoryIdStr.isBlank() ? Long.parseLong(categoryIdStr) : null;
+            Boolean active = activeStr != null && !activeStr.isBlank() ? "true".equalsIgnoreCase(activeStr) : null;
+
+            UpdateProductRequest request = new UpdateProductRequest(
+                    name, price, stock, brand, size,
+                    season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
+                    vehicleType != null && !vehicleType.isBlank()
+                            ? com.pneumaliback.www.enums.VehicleType.valueOf(vehicleType)
+                            : null,
+                    imageUrl, description, categoryId, active);
+
             Product product = productService.updateFromRequest(id, request);
             return ResponseEntity.ok(product);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", "Format numérique invalide"));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", "Erreur lors de l'upload de l'image: " + e.getMessage()));
         } catch (Exception e) {
             return handleException(e);
         }

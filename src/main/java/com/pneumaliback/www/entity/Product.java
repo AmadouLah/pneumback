@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.pneumaliback.www.enums.TireSeason;
 import com.pneumaliback.www.enums.VehicleType;
 
@@ -57,12 +58,15 @@ public class Product extends EntiteAuditable {
     @ManyToOne(optional = false)
     private Category category;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "product")
     private List<OrderItem> orderItems = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "product")
     private List<Review> reviews = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "product")
     private List<Favori> favoris = new ArrayList<>();
 }
