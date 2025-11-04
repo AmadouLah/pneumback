@@ -37,17 +37,10 @@ public class ProductController {
     private final BrandRepository brandRepository;
     private final StorageService storageService;
 
-    private ResponseEntity<?> handleException(Exception e) {
-        if (e instanceof IllegalArgumentException) {
-            String msg = e.getMessage() != null ? e.getMessage() : "Requête invalide";
-            if (msg.toLowerCase().contains("introuvable") || msg.toLowerCase().contains("non trouv")) {
-                return ResponseEntity.status(404).body(java.util.Map.of("error", msg));
-            }
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", msg));
-        }
-        return ResponseEntity.internalServerError()
-                .body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
-    }
+    /**
+     * Endpoints publics de consultation des produits
+     * Les exceptions sont gérées par GlobalExceptionHandler
+     */
 
     @GetMapping("/active")
     @Operation(summary = "Lister produits actifs (page)")
@@ -56,11 +49,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> listActive(Pageable pageable) {
-        try {
-            return ResponseEntity.ok(productService.listActive(pageable));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.listActive(pageable));
     }
 
     @GetMapping("/search")
@@ -71,11 +60,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> search(@RequestParam String term, Pageable pageable) {
-        try {
-            return ResponseEntity.ok(productService.searchActive(term, pageable));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.searchActive(term, pageable));
     }
 
     @GetMapping("/filter")
@@ -93,22 +78,18 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             Pageable pageable) {
-        try {
-            Category category = null;
-            if (categoryId != null) {
-                category = categoryRepository.findById(categoryId)
-                        .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
-            }
-            Brand brand = null;
-            if (brandId != null) {
-                brand = brandRepository.findById(brandId)
-                        .orElseThrow(() -> new IllegalArgumentException("Marque introuvable"));
-            }
-            return ResponseEntity
-                    .ok(productService.findWithFilters(category, brand, size, season, minPrice, maxPrice, pageable));
-        } catch (Exception e) {
-            return handleException(e);
+        Category category = null;
+        if (categoryId != null) {
+            category = categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
         }
+        Brand brand = null;
+        if (brandId != null) {
+            brand = brandRepository.findById(brandId)
+                    .orElseThrow(() -> new IllegalArgumentException("Marque introuvable"));
+        }
+        return ResponseEntity
+                .ok(productService.findWithFilters(category, brand, size, season, minPrice, maxPrice, pageable));
     }
 
     @GetMapping
@@ -119,11 +100,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> listAll(Pageable pageable) {
-        try {
-            return ResponseEntity.ok(productService.listAll(pageable));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.listAll(pageable));
     }
 
     @GetMapping("/{id}")
@@ -134,11 +111,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> getById(@PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(productService.findById(id));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.findById(id));
     }
 
     @PostMapping
@@ -202,9 +175,8 @@ public class ProductController {
         } catch (IOException e) {
             return ResponseEntity.badRequest()
                     .body(java.util.Map.of("error", "Erreur lors de l'upload de l'image: " + e.getMessage()));
-        } catch (Exception e) {
-            return handleException(e);
         }
+        // Les autres exceptions sont gérées par GlobalExceptionHandler
     }
 
     @PutMapping("/{id}")
@@ -277,9 +249,8 @@ public class ProductController {
         } catch (IOException e) {
             return ResponseEntity.badRequest()
                     .body(java.util.Map.of("error", "Erreur lors de l'upload de l'image: " + e.getMessage()));
-        } catch (Exception e) {
-            return handleException(e);
         }
+        // Les autres exceptions sont gérées par GlobalExceptionHandler
     }
 
     @DeleteMapping("/{id}")
@@ -291,12 +262,9 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        try {
-            productService.delete(id);
-            return ResponseEntity.ok(java.util.Map.of("message", "Produit supprimé avec succès"));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        productService.delete(id);
+        return ResponseEntity.ok(java.util.Map.of("message", "Produit supprimé avec succès"));
+        // Les exceptions sont gérées par GlobalExceptionHandler
     }
 
     @GetMapping("/popular")
@@ -306,11 +274,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> popular(Pageable pageable) {
-        try {
-            return ResponseEntity.ok(productService.popular(pageable));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.popular(pageable));
     }
 
     @GetMapping("/brands")
@@ -320,11 +284,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> brands() {
-        try {
-            return ResponseEntity.ok(productService.brands());
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.brands());
     }
 
     @GetMapping("/dimensions")
@@ -338,10 +298,6 @@ public class ProductController {
             @RequestParam(required = false) String profile,
             @RequestParam(required = false) String diameter,
             Pageable pageable) {
-        try {
-            return ResponseEntity.ok(productService.findByDimensions(width, profile, diameter, pageable));
-        } catch (Exception e) {
-            return handleException(e);
-        }
+        return ResponseEntity.ok(productService.findByDimensions(width, profile, diameter, pageable));
     }
 }

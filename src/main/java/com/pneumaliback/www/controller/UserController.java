@@ -23,69 +23,49 @@ public class UserController {
 
     /**
      * Mise à jour du profil utilisateur
+     * Les exceptions sont gérées par GlobalExceptionHandler
      */
     @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(
+    public ResponseEntity<Map<String, Object>> updateProfile(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody UpdateProfileRequest request) {
-        try {
-            User updatedUser = userService.updateProfile(userDetails.getUsername(), request);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Profil mis à jour avec succès",
-                    "user", Map.of(
-                            "id", updatedUser.getId(),
-                            "email", updatedUser.getEmail(),
-                            "firstName", updatedUser.getFirstName() != null ? updatedUser.getFirstName() : "",
-                            "lastName", updatedUser.getLastName() != null ? updatedUser.getLastName() : "",
-                            "phoneNumber", updatedUser.getPhoneNumber(),
-                            "role", updatedUser.getRole().name())));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Erreur lors de la mise à jour du profil"));
-        }
+            @Valid @RequestBody UpdateProfileRequest request) {
+        User updatedUser = userService.updateProfile(userDetails.getUsername(), request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Profil mis à jour avec succès",
+                "user", Map.of(
+                        "id", updatedUser.getId(),
+                        "email", updatedUser.getEmail(),
+                        "firstName", updatedUser.getFirstName() != null ? updatedUser.getFirstName() : "",
+                        "lastName", updatedUser.getLastName() != null ? updatedUser.getLastName() : "",
+                        "phoneNumber", updatedUser.getPhoneNumber() != null ? updatedUser.getPhoneNumber() : "",
+                        "role", updatedUser.getRole().name())));
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<?> getProfile(@AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            User user = userService.getProfile(userDetails.getUsername());
-            UserProfileResponse response = UserProfileResponse.builder()
-                    .id(user.getId())
-                    .email(user.getEmail())
-                    .firstName(user.getFirstName())
-                    .lastName(user.getLastName())
-                    .phoneNumber(user.getPhoneNumber())
-                    .build();
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Erreur lors de la récupération du profil"));
-        }
+    public ResponseEntity<UserProfileResponse> getProfile(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.getProfile(userDetails.getUsername());
+        UserProfileResponse response = UserProfileResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .phoneNumber(user.getPhoneNumber())
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Mise à jour du genre de l'utilisateur
+     * Les exceptions sont gérées par GlobalExceptionHandler
      */
     @PutMapping("/gender")
-    public ResponseEntity<?> updateGender(
+    public ResponseEntity<Map<String, Object>> updateGender(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UpdateGenderRequest request) {
-        try {
-            User updatedUser = userService.updateGender(userDetails.getUsername(), request);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Genre mis à jour avec succès",
-                    "gender", updatedUser.getGender() != null ? updatedUser.getGender().name() : null));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Erreur lors de la mise à jour du genre"));
-        }
+        User updatedUser = userService.updateGender(userDetails.getUsername(), request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Genre mis à jour avec succès",
+                "gender", updatedUser.getGender() != null ? updatedUser.getGender().name() : null));
     }
 }

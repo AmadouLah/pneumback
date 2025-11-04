@@ -135,6 +135,14 @@ public class SecurityConfig {
                 auth
                                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                // Consultation des produits accessible publiquement (GET uniquement)
+                                .requestMatchers(HttpMethod.GET, "/api/products/active").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/search").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/filter").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/popular").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/brands").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/dimensions").permitAll()
                                 .requestMatchers("/api/admin/**").hasAnyRole(ADMIN_ROLES)
                                 .requestMatchers("/api/influenceur/**").hasRole(Role.INFLUENCEUR.name())
                                 .anyRequest().authenticated();

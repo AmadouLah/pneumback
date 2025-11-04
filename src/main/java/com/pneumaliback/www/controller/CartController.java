@@ -25,7 +25,8 @@ public class CartController {
     private final UserRepository userRepository;
 
     private User getUser(Long userId) {
-        return userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé"));
     }
 
     private ResponseEntity<?> handleException(Exception e) {
@@ -36,7 +37,8 @@ public class CartController {
             }
             return ResponseEntity.badRequest().body(java.util.Map.of("error", msg));
         }
-        return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
+        return ResponseEntity.internalServerError()
+                .body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
     }
 
     @GetMapping
@@ -64,8 +66,8 @@ public class CartController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> addItem(@RequestParam Long userId,
-                                        @RequestParam Long productId,
-                                        @RequestParam int quantity) {
+            @RequestParam Long productId,
+            @RequestParam int quantity) {
         try {
             return ResponseEntity.ok(cartService.addItem(getUser(userId), productId, quantity));
         } catch (Exception e) {
@@ -82,8 +84,8 @@ public class CartController {
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
     public ResponseEntity<?> updateItem(@RequestParam Long userId,
-                                           @RequestParam Long productId,
-                                           @RequestParam int quantity) {
+            @RequestParam Long productId,
+            @RequestParam int quantity) {
         try {
             return ResponseEntity.ok(cartService.updateItem(getUser(userId), productId, quantity));
         } catch (Exception e) {
@@ -107,4 +109,3 @@ public class CartController {
         }
     }
 }
-
