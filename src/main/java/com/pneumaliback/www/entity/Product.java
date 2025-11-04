@@ -53,6 +53,9 @@ public class Product extends EntiteAuditable {
     @ManyToOne
     private VehicleType vehicleType;
 
+    @ManyToOne
+    private TireCondition tireCondition;
+
     @Column(length = 255)
     private String imageUrl;
 

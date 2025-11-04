@@ -20,10 +20,10 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
        // === Actifs ===
-       @Query("SELECT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.active = true")
+       @Query("SELECT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.active = true")
        Page<Product> findByActiveTrue(Pageable pageable);
 
-       @Query("SELECT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.id = :id")
+       @Query("SELECT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.id = :id")
        Optional<Product> findByIdWithDimensions(@Param("id") Long id);
 
        List<Product> findByCategoryAndActiveTrue(Category category);
@@ -93,7 +93,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
        void increaseStock(@Param("productId") Long productId, @Param("quantity") int quantity);
 
        // === Recherche combinée avancée ===
-       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.active = true AND "
+       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.active = true AND "
                      +
                      "(:category IS NULL OR p.category = :category) AND " +
                      "(:brand IS NULL OR p.brand = :brand) AND " +
@@ -111,7 +111,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                      Pageable pageable);
 
        // === Recherche textuelle ===
-       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.active = true AND "
+       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.active = true AND "
                      +
                      "(LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
                      "LOWER(p.brand.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
@@ -119,7 +119,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
        Page<Product> searchProducts(@Param("searchTerm") String searchTerm, Pageable pageable);
 
        // === Statistiques et recommandations ===
-       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.active = true ORDER BY SIZE(p.orderItems) DESC")
+       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.active = true ORDER BY SIZE(p.orderItems) DESC")
        Page<Product> findPopular(Pageable pageable);
 
        @Query("SELECT p FROM Product p WHERE p.active = true AND p.createdAt >= :date")
@@ -131,7 +131,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
        // === Dimensions (width/profile/diameter) - Recherche par entités de dimensions
        // ===
-       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType WHERE p.active = true AND p.stock > 0 AND "
+       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition WHERE p.active = true AND p.stock > 0 AND "
                      +
                      "(:width IS NULL OR p.width.value = :widthInt) AND " +
                      "(:profile IS NULL OR p.profile.value = :profileInt) AND " +
@@ -145,6 +145,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                      Pageable pageable);
 
        // === Admin: Liste tous les produits avec dimensions ===
-       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType")
+       @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.width LEFT JOIN FETCH p.profile LEFT JOIN FETCH p.diameter LEFT JOIN FETCH p.brand LEFT JOIN FETCH p.vehicleType LEFT JOIN FETCH p.tireCondition")
        Page<Product> findAllWithDimensions(Pageable pageable);
 }

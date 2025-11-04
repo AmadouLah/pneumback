@@ -161,6 +161,7 @@ public class ProductController {
             @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
             @RequestParam(value = "vehicleTypeId", required = false) String vehicleTypeIdStr,
+            @RequestParam(value = "tireConditionId", required = false) String tireConditionIdStr,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("categoryId") String categoryIdStr,
             @RequestParam(value = "active", defaultValue = "true") String activeStr) {
@@ -182,11 +183,15 @@ public class ProductController {
             Long vehicleTypeId = vehicleTypeIdStr != null && !vehicleTypeIdStr.isBlank()
                     ? Long.parseLong(vehicleTypeIdStr)
                     : null;
+            Long tireConditionId = tireConditionIdStr != null && !tireConditionIdStr.isBlank()
+                    ? Long.parseLong(tireConditionIdStr)
+                    : null;
 
             CreateProductRequest request = new CreateProductRequest(
                     name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
                     vehicleTypeId,
+                    tireConditionId,
                     imageUrl, description, categoryId, active);
 
             Product product = productService.createFromRequest(request);
@@ -224,6 +229,7 @@ public class ProductController {
             @RequestParam(value = "diameterId", required = false) String diameterIdStr,
             @RequestParam(value = "season", required = false) String season,
             @RequestParam(value = "vehicleTypeId", required = false) String vehicleTypeIdStr,
+            @RequestParam(value = "tireConditionId", required = false) String tireConditionIdStr,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "categoryId", required = false) String categoryIdStr,
             @RequestParam(value = "active", required = false) String activeStr) {
@@ -252,11 +258,15 @@ public class ProductController {
             Long vehicleTypeId = vehicleTypeIdStr != null && !vehicleTypeIdStr.isBlank()
                     ? Long.parseLong(vehicleTypeIdStr)
                     : null;
+            Long tireConditionId = tireConditionIdStr != null && !tireConditionIdStr.isBlank()
+                    ? Long.parseLong(tireConditionIdStr)
+                    : null;
 
             UpdateProductRequest request = new UpdateProductRequest(
                     name, price, stock, brandId, size, widthId, profileId, diameterId,
                     season != null && !season.isBlank() ? com.pneumaliback.www.enums.TireSeason.valueOf(season) : null,
                     vehicleTypeId,
+                    tireConditionId,
                     imageUrl, description, categoryId, active);
 
             Product product = productService.updateFromRequest(id, request);
