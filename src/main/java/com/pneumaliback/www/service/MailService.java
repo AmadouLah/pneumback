@@ -161,4 +161,30 @@ public class MailService {
             }
         }
     }
+
+    @Async
+    public void sendWelcomeEmail(String toEmail, String firstName, String resetToken) {
+        if (toEmail == null || toEmail.trim().isEmpty() || resetToken == null || resetToken.trim().isEmpty()) {
+            log.warn("Paramètres email invalides pour l'email de bienvenue");
+            return;
+        }
+
+        String subject = "Bienvenue sur PneuMali - Définissez votre mot de passe";
+        String greeting = firstName != null && !firstName.trim().isEmpty() ? "Bonjour " + firstName + "," : "Bonjour,";
+
+        // Générer le lien de réinitialisation (à adapter selon votre frontend)
+        String resetLink = "https://pneumali.com/auth/reset-password?token=" + resetToken + "&email=" + toEmail;
+
+        String body = greeting + "\n\n"
+                + "Bienvenue dans l'équipe PneuMali en tant qu'influenceur !\n\n"
+                + "Votre compte a été créé avec succès. Pour commencer, vous devez définir votre mot de passe.\n\n"
+                + "Cliquez sur le lien ci-dessous pour définir votre mot de passe :\n"
+                + resetLink + "\n\n"
+                + "Ce lien est valide pendant 7 jours.\n\n"
+                + "Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet email.\n\n"
+                + "Cordialement,\n"
+                + "L'équipe PneuMali";
+
+        sendEmailSafely(toEmail, subject, body, "bienvenue influenceur");
+    }
 }

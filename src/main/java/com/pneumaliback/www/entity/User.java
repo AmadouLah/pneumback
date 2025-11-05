@@ -112,7 +112,7 @@ public class User extends EntiteAuditable implements UserDetails {
     @Column
     private Integer otpResendCount;
 
-    @Column(length = 10)
+    @Column(length = 255)
     private String resetCode;
 
     @Column

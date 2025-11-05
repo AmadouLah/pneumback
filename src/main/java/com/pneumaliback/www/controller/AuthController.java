@@ -7,6 +7,7 @@ import com.pneumaliback.www.dto.MessageResponse;
 import com.pneumaliback.www.dto.ResendVerificationRequest;
 import com.pneumaliback.www.dto.ForgotPasswordRequest;
 import com.pneumaliback.www.dto.ResetPasswordRequest;
+import com.pneumaliback.www.dto.SetInitialPasswordRequest;
 import com.pneumaliback.www.dto.RefreshTokenRequest;
 import com.pneumaliback.www.dto.VerificationRequest;
 import com.pneumaliback.www.dto.VerifyCodeRequest;
@@ -129,6 +130,23 @@ public class AuthController {
         try {
             log.info("Confirmation de réinitialisation pour l'email: {}", request.email());
             MessageResponse response = authService.confirmPasswordReset(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @PostMapping("/set-initial-password")
+    @Operation(summary = "Définir mot de passe initial", description = "Définit le mot de passe initial pour un nouveau compte avec un token")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Mot de passe défini", content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> setInitialPassword(@Valid @RequestBody SetInitialPasswordRequest request) {
+        try {
+            log.info("Définition du mot de passe initial pour l'email: {}", request.email());
+            MessageResponse response = authService.setInitialPassword(request);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return handleException(e);

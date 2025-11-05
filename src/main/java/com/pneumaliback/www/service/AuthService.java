@@ -55,9 +55,10 @@ public class AuthService {
             String normalizedEmail = normalizeEmail(request.email());
             User userForRole = userRepository.findByEmailIgnoreCase(normalizedEmail)
                     .orElseThrow(() -> new IllegalArgumentException("Identifiants invalides"));
-            if (userForRole.getRole() != Role.ADMIN && userForRole.getRole() != Role.DEVELOPER) {
+            if (userForRole.getRole() != Role.ADMIN && userForRole.getRole() != Role.DEVELOPER
+                    && userForRole.getRole() != Role.INFLUENCEUR) {
                 throw new RuntimeException(
-                        "La connexion par mot de passe est réservée aux administrateurs et développeurs. Utilisez la connexion par e-mail.");
+                        "La connexion par mot de passe est réservée aux administrateurs, développeurs et influenceurs. Utilisez la connexion par e-mail.");
             }
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(normalizedEmail, request.password()));
@@ -504,7 +505,7 @@ public class AuthService {
         var userOpt = userRepository.findByEmailIgnoreCase(normalized);
         if (userOpt.isPresent()) {
             Role role = userOpt.get().getRole();
-            if (role == Role.ADMIN || role == Role.DEVELOPER) {
+            if (role == Role.ADMIN || role == Role.DEVELOPER || role == Role.INFLUENCEUR) {
                 return new StartLoginResponse("ADMIN_PASSWORD", "Connexion par mot de passe");
             }
         }
@@ -578,15 +579,49 @@ public class AuthService {
         auditService.logAuthEvent("PASSWORD_RESET_REQUEST", user.getEmail(), null, null, null);
     }
 
+    @Transactional
+    public MessageResponse setInitialPassword(com.pneumaliback.www.dto.SetInitialPasswordRequest request) {
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new RuntimeException("Les mots de passe ne correspondent pas");
+        }
+
+        String normalizedEmail = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (user.getResetCode() == null || user.getResetExpiry() == null) {
+            throw new RuntimeException("Aucun token de définition de mot de passe actif");
+        }
+
+        if (!passwordEncoder.matches(request.token(), user.getResetCode())) {
+            throw new RuntimeException("Token invalide");
+        }
+
+        if (Instant.now().isAfter(user.getResetExpiry())) {
+            throw new RuntimeException("Token expiré");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setEnabled(true); // Activer le compte une fois le mot de passe défini
+        user.setResetCode(null);
+        user.setResetExpiry(null);
+        user.setResetSentAt(null);
+        userRepository.saveAndFlush(user);
+
+        auditService.logAuthEvent("INITIAL_PASSWORD_SET", user.getEmail(), null, null, null);
+        return new MessageResponse("Mot de passe défini avec succès. Votre compte est maintenant activé.");
+    }
+
     /**
      * Détermine si la vérification par code 2FA est requise
      * 
-     * ADMIN et DEVELOPER : 2FA obligatoire à CHAQUE connexion (sécurité maximale)
-     * CLIENT/INFLUENCEUR : Pas de 2FA (connexion par magic link uniquement)
+     * ADMIN, DEVELOPER et INFLUENCEUR : 2FA obligatoire à CHAQUE connexion
+     * (sécurité maximale)
+     * CLIENT : Pas de 2FA (connexion par magic link uniquement)
      */
     private boolean requiresCodeVerification(User user, String ip, String userAgent) {
-        // ADMIN et DEVELOPER : toujours 2FA à chaque connexion
-        return user.getRole() == Role.ADMIN || user.getRole() == Role.DEVELOPER;
+        // ADMIN, DEVELOPER et INFLUENCEUR : toujours 2FA à chaque connexion
+        return user.getRole() == Role.ADMIN || user.getRole() == Role.DEVELOPER || user.getRole() == Role.INFLUENCEUR;
     }
 
     /**
