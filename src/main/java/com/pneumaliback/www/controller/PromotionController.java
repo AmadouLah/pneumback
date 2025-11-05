@@ -1,20 +1,25 @@
 package com.pneumaliback.www.controller;
 
 import com.pneumaliback.www.entity.Promotion;
+import com.pneumaliback.www.dto.PromotionCreateDTO;
+import com.pneumaliback.www.dto.PromotionResponse;
+import com.pneumaliback.www.dto.UpdatePromotionRequest;
 import com.pneumaliback.www.service.PromotionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.Optional;
-import com.pneumaliback.www.dto.PromotionCreateDTO;
 
 @RestController
 @RequestMapping("/api/promotions")
@@ -33,7 +38,8 @@ public class PromotionController {
             }
             return ResponseEntity.badRequest().body(java.util.Map.of("error", msg));
         }
-        return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
+        return ResponseEntity.internalServerError()
+                .body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
     }
 
     @GetMapping("/validate")
@@ -75,17 +81,90 @@ public class PromotionController {
     @PostMapping
     @Operation(summary = "Créer une promotion")
     @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Promotion créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Promotion.class))),
+            @ApiResponse(responseCode = "200", description = "Promotion créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
     })
-    public ResponseEntity<?> create(@RequestBody PromotionCreateDTO dto) {
+    public ResponseEntity<?> create(@Valid @RequestBody PromotionCreateDTO dto) {
         try {
-            return ResponseEntity.ok(promotionService.create(dto));
+            PromotionResponse response = promotionService.create(dto);
+            return ResponseEntity.ok(Map.of("message", "Promotion créée avec succès", "promotion", response));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @GetMapping("/admin")
+    @Operation(summary = "Lister toutes les promotions (admin)", description = "Récupère la liste de toutes les promotions")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getAll() {
+        try {
+            return ResponseEntity.ok(promotionService.findAll());
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @GetMapping("/admin/{id}")
+    @Operation(summary = "Récupérer une promotion par ID (admin)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Promotion trouvée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Promotion introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        try {
+            return promotionService.findById(id)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.status(404).body(Map.of("error", "Promotion introuvable")));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @PutMapping("/admin/{id}")
+    @Operation(summary = "Mettre à jour une promotion (admin)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Promotion mise à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Promotion introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody UpdatePromotionRequest request) {
+        try {
+            PromotionResponse response = promotionService.update(id, request);
+            return ResponseEntity.ok(Map.of("message", "Promotion mise à jour avec succès", "promotion", response));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @DeleteMapping("/admin/{id}")
+    @Operation(summary = "Supprimer une promotion (admin)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Promotion supprimée"),
+            @ApiResponse(responseCode = "404", description = "Promotion introuvable", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        try {
+            promotionService.delete(id);
+            return ResponseEntity.ok(Map.of("message", "Promotion supprimée avec succès"));
         } catch (Exception e) {
             return handleException(e);
         }
     }
 }
-
