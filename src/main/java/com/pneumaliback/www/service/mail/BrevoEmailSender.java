@@ -33,6 +33,11 @@ public class BrevoEmailSender implements EmailSender {
 
     @Override
     public void sendEmail(String to, String subject, String body) throws Exception {
+        sendHtmlEmail(to, subject, "<pre>" + body.replace("\n", "<br>") + "</pre>", body);
+    }
+
+    @Override
+    public void sendHtmlEmail(String to, String subject, String htmlBody, String textBody) throws Exception {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -49,8 +54,8 @@ public class BrevoEmailSender implements EmailSender {
             emailPayload.put("sender", sender);
             emailPayload.put("to", new Object[] { recipient });
             emailPayload.put("subject", subject);
-            emailPayload.put("htmlContent", "<pre>" + body.replace("\n", "<br>") + "</pre>");
-            emailPayload.put("textContent", body);
+            emailPayload.put("htmlContent", htmlBody);
+            emailPayload.put("textContent", textBody != null ? textBody : htmlBody.replaceAll("<[^>]+>", ""));
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(emailPayload, headers);
 

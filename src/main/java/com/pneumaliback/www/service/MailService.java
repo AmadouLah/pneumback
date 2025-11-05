@@ -27,6 +27,9 @@ public class MailService {
     @Value("${app.contact.email:}")
     private String contactEmail;
 
+    @Value("${app.frontend-url:https://pneufront.vercel.app}")
+    private String frontendUrl;
+
     @Async
     public void sendVerificationEmail(String toEmail, String code) {
         if (toEmail == null || toEmail.trim().isEmpty() || code == null || code.trim().isEmpty()) {
@@ -55,6 +58,18 @@ public class MailService {
             log.info("✅ Email {} CONFIRMÉ envoyé via {} à {}", type, emailSender.getProviderName(), to);
         } catch (Exception e) {
             log.error("❌ ÉCHEC envoi email {} à {} via {}", type, to, emailSender.getProviderName());
+            log.error("❌ Raison: {}", e.getMessage());
+            log.error("❌ Stack trace:", e);
+        }
+    }
+
+    private void sendHtmlEmailSafely(String to, String subject, String htmlBody, String textBody, String type) {
+        try {
+            log.info("📧 Préparation envoi email HTML {} via {} à {}", type, emailSender.getProviderName(), to);
+            emailSender.sendHtmlEmail(to, subject, htmlBody, textBody);
+            log.info("✅ Email HTML {} CONFIRMÉ envoyé via {} à {}", type, emailSender.getProviderName(), to);
+        } catch (Exception e) {
+            log.error("❌ ÉCHEC envoi email HTML {} à {} via {}", type, to, emailSender.getProviderName());
             log.error("❌ Raison: {}", e.getMessage());
             log.error("❌ Stack trace:", e);
         }
@@ -171,20 +186,87 @@ public class MailService {
 
         String subject = "Bienvenue sur PneuMali - Définissez votre mot de passe";
         String greeting = firstName != null && !firstName.trim().isEmpty() ? "Bonjour " + firstName + "," : "Bonjour,";
+        String baseUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+        String resetLink = baseUrl + "/auth/set-password?token=" + resetToken + "&email=" + toEmail;
 
-        // Générer le lien de réinitialisation (à adapter selon votre frontend)
-        String resetLink = "https://pneumali.com/auth/reset-password?token=" + resetToken + "&email=" + toEmail;
-
-        String body = greeting + "\n\n"
+        String htmlBody = buildWelcomeEmailHtml(greeting, resetLink);
+        String textBody = greeting + "\n\n"
                 + "Bienvenue dans l'équipe PneuMali en tant qu'influenceur !\n\n"
                 + "Votre compte a été créé avec succès. Pour commencer, vous devez définir votre mot de passe.\n\n"
-                + "Cliquez sur le lien ci-dessous pour définir votre mot de passe :\n"
-                + resetLink + "\n\n"
+                + "Définir votre mot de passe : " + resetLink + "\n\n"
                 + "Ce lien est valide pendant 7 jours.\n\n"
                 + "Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet email.\n\n"
                 + "Cordialement,\n"
                 + "L'équipe PneuMali";
 
-        sendEmailSafely(toEmail, subject, body, "bienvenue influenceur");
+        sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "bienvenue influenceur");
+    }
+
+    private String buildWelcomeEmailHtml(String greeting, String resetLink) {
+        return """
+                <!DOCTYPE html>
+                <html lang="fr">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+                        <tr>
+                            <td align="center">
+                                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <tr>
+                                        <td style="padding: 40px 40px 20px; text-align: center; background-color: #000000; border-radius: 8px 8px 0 0;">
+                                            <h1 style="margin: 0; color: #00d9ff; font-size: 28px; font-weight: bold;">PneuMali</h1>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 30px 40px;">
+                                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">"""
+                + greeting + """
+                        </p>
+                        <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
+                            Bienvenue dans l'équipe PneuMali en tant qu'influenceur !
+                        </p>
+                        <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.6;">
+                            Votre compte a été créé avec succès. Pour commencer, vous devez définir votre mot de passe.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td align="center" style="padding: 20px 0;">
+                                    <a href=\"""" + resetLink
+                + """
+                                                                    " style="display: inline-block; padding: 14px 32px; background-color: #00d9ff; color: #000000; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; text-align: center;">
+                                                                    Définir mon mot de passe
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    <p style="margin: 30px 0 20px; color: #666666; font-size: 14px; line-height: 1.6;">
+                                                        Ce lien est valide pendant 7 jours.
+                                                    </p>
+                                                    <p style="margin: 0 0 30px; color: #666666; font-size: 14px; line-height: 1.6;">
+                                                        Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet email.
+                                                    </p>
+                                                    <p style="margin: 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                                        Cordialement,<br>
+                                                        <strong>L'équipe PneuMali</strong>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 8px 8px; text-align: center;">
+                                                    <p style="margin: 0; color: #999999; font-size: 12px;">
+                                                        © 2025 PneuMali. Tous droits réservés.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </body>
+                        </html>
+                        """;
     }
 }
