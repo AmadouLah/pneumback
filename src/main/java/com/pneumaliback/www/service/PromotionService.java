@@ -75,16 +75,14 @@ public class PromotionService {
             case PERCENTAGE -> {
                 if (dto.discountPercentage() == null)
                     throw new IllegalArgumentException("Pourcentage requis");
-                if (dto.discountPercentage().scale() > 2 || dto.discountPercentage().signum() < 0)
-                    throw new IllegalArgumentException("Pourcentage invalide");
+                validatePercentage(dto.discountPercentage());
                 p.setDiscountPercentage(dto.discountPercentage());
                 p.setDiscountAmount(null);
             }
             case FIXED_AMOUNT -> {
                 if (dto.discountAmount() == null)
                     throw new IllegalArgumentException("Montant requis");
-                if (dto.discountAmount().scale() > 2 || dto.discountAmount().signum() <= 0)
-                    throw new IllegalArgumentException("Montant invalide");
+                validateAmount(dto.discountAmount());
                 p.setDiscountAmount(dto.discountAmount());
                 p.setDiscountPercentage(null);
             }
@@ -151,24 +149,26 @@ public class PromotionService {
         }
 
         PromotionType type = request.type() != null ? request.type() : promotion.getType();
+        boolean typeChanged = request.type() != null && !request.type().equals(promotion.getType());
+
         switch (type) {
             case PERCENTAGE -> {
                 if (request.discountPercentage() != null) {
-                    if (request.discountPercentage().scale() > 2 || request.discountPercentage().signum() < 0) {
-                        throw new IllegalArgumentException("Pourcentage invalide");
-                    }
+                    validatePercentage(request.discountPercentage());
                     promotion.setDiscountPercentage(request.discountPercentage());
-                    promotion.setDiscountAmount(null);
+                } else if (typeChanged) {
+                    throw new IllegalArgumentException("Pourcentage requis pour une promotion de type PERCENTAGE");
                 }
+                promotion.setDiscountAmount(null);
             }
             case FIXED_AMOUNT -> {
                 if (request.discountAmount() != null) {
-                    if (request.discountAmount().scale() > 2 || request.discountAmount().signum() <= 0) {
-                        throw new IllegalArgumentException("Montant invalide");
-                    }
+                    validateAmount(request.discountAmount());
                     promotion.setDiscountAmount(request.discountAmount());
-                    promotion.setDiscountPercentage(null);
+                } else if (typeChanged) {
+                    throw new IllegalArgumentException("Montant requis pour une promotion de type FIXED_AMOUNT");
                 }
+                promotion.setDiscountPercentage(null);
             }
         }
 
@@ -247,6 +247,24 @@ public class PromotionService {
         };
 
         return clampDiscount(subtotal, discount);
+    }
+
+    private void validatePercentage(BigDecimal percentage) {
+        if (percentage == null) {
+            throw new IllegalArgumentException("Pourcentage requis");
+        }
+        if (percentage.scale() > 2 || percentage.signum() < 0) {
+            throw new IllegalArgumentException("Pourcentage invalide");
+        }
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount == null) {
+            throw new IllegalArgumentException("Montant requis");
+        }
+        if (amount.scale() > 2 || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Montant invalide");
+        }
     }
 
     private BigDecimal clampDiscount(BigDecimal base, BigDecimal discount) {

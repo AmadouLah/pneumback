@@ -23,6 +23,7 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
     public void run(String... args) throws Exception {
         log.info("Début des migrations de base de données...");
         fixRoleConstraint();
+        fixPromotionsDiscountPercentage();
         log.info("Migrations de base de données terminées.");
     }
 
@@ -43,6 +44,32 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Erreur lors de la mise à jour de la contrainte users_role_check: {}", e.getMessage());
             // Ne pas bloquer le démarrage si la contrainte est déjà correcte
+        }
+    }
+
+    /**
+     * Permet à discount_percentage d'être NULL pour les promotions de type
+     * FIXED_AMOUNT
+     */
+    private void fixPromotionsDiscountPercentage() {
+        try {
+            // Vérifie si la colonne existe et a la contrainte NOT NULL
+            Boolean isNotNull = jdbcTemplate.queryForObject(
+                    "SELECT is_nullable = 'NO' FROM information_schema.columns " +
+                            "WHERE table_name = 'promotions' AND column_name = 'discount_percentage'",
+                    Boolean.class);
+
+            if (Boolean.TRUE.equals(isNotNull)) {
+                jdbcTemplate.execute("ALTER TABLE promotions ALTER COLUMN discount_percentage DROP NOT NULL");
+                log.info("Contrainte NOT NULL supprimée de discount_percentage dans promotions");
+            } else if (isNotNull != null) {
+                log.debug("discount_percentage est déjà nullable dans promotions");
+            }
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            log.debug("Table promotions ou colonne discount_percentage n'existe pas encore, sera créée par Hibernate");
+        } catch (Exception e) {
+            log.warn("Erreur lors de la mise à jour de discount_percentage dans promotions: {}", e.getMessage());
+            // Ne pas bloquer le démarrage si la modification échoue
         }
     }
 }

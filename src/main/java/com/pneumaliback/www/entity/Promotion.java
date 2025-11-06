@@ -25,12 +25,12 @@ import lombok.EqualsAndHashCode;
 public class Promotion extends EntiteAuditable {
     @Column(nullable = false, unique = true, length = 100)
     private String code;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PromotionType type;
 
-    @Column(nullable = false, precision = 5, scale = 2)
+    @Column(precision = 5, scale = 2)
     private BigDecimal discountPercentage;
 
     @Column(precision = 10, scale = 2)
