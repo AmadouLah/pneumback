@@ -12,8 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -184,6 +186,80 @@ public class PromotionService {
         Promotion promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Promotion introuvable"));
         promotionRepository.delete(promotion);
+    }
+
+    /**
+     * Trouve une promotion valide par code (promotion directe ou via code
+     * influenceur)
+     */
+    public Optional<Promotion> findValidPromotionByCode(String code) {
+        if (code == null || code.isBlank()) {
+            return Optional.empty();
+        }
+        String normalized = code.trim();
+
+        // Essayer d'abord les promotions directes
+        Optional<Promotion> directPromo = findValidByCode(normalized);
+        if (directPromo.isPresent()) {
+            return directPromo;
+        }
+
+        // Essayer via code influenceur
+        return resolveFromInfluencerCode(normalized);
+    }
+
+    /**
+     * Calcule le montant de la réduction pour une promotion donnée et un sous-total
+     */
+    public BigDecimal calculateDiscount(BigDecimal subtotal, Promotion promo) {
+        if (promo == null || subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        PromotionType type = promo.getType();
+        if (type == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal discount = switch (type) {
+            case PERCENTAGE -> {
+                if (promo.getDiscountPercentage() == null) {
+                    yield BigDecimal.ZERO;
+                }
+                BigDecimal percent = promo.getDiscountPercentage();
+                yield subtotal.multiply(percent).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+            }
+            case FIXED_AMOUNT -> {
+                if (promo.getDiscountAmount() == null) {
+                    yield BigDecimal.ZERO;
+                }
+                yield promo.getDiscountAmount();
+            }
+            case INFLUENCER_CODE -> {
+                BigDecimal viaPercent = promo.getDiscountPercentage() != null
+                        ? subtotal.multiply(promo.getDiscountPercentage()).divide(BigDecimal.valueOf(100), 2,
+                                java.math.RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+                BigDecimal viaAmount = Objects.requireNonNullElse(promo.getDiscountAmount(), BigDecimal.ZERO);
+                yield viaPercent.max(viaAmount);
+            }
+            default -> BigDecimal.ZERO;
+        };
+
+        return clampDiscount(subtotal, discount);
+    }
+
+    private BigDecimal clampDiscount(BigDecimal base, BigDecimal discount) {
+        if (discount == null) {
+            return BigDecimal.ZERO;
+        }
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO;
+        }
+        if (discount.compareTo(base) > 0) {
+            return base;
+        }
+        return discount;
     }
 
     private PromotionResponse toResponse(Promotion promotion) {

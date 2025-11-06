@@ -3,8 +3,10 @@ package com.pneumaliback.www.controller;
 import com.pneumaliback.www.entity.Promotion;
 import com.pneumaliback.www.dto.PromotionCreateDTO;
 import com.pneumaliback.www.dto.PromotionResponse;
+import com.pneumaliback.www.dto.PromotionValidationResponse;
 import com.pneumaliback.www.dto.UpdatePromotionRequest;
 import com.pneumaliback.www.service.PromotionService;
+import java.math.BigDecimal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -55,6 +57,49 @@ public class PromotionController {
             Optional<Promotion> promo = promotionService.findValidByCode(code);
             return promo.<ResponseEntity<?>>map(ResponseEntity::ok)
                     .orElse(ResponseEntity.status(404).body(java.util.Map.of("error", "Promotion introuvable")));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+
+    @PostMapping("/validate-discount")
+    @Operation(summary = "Valider un code promo et calculer la réduction", description = "Valide un code promo et calcule le montant de la réduction pour un sous-total donné")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Code valide et réduction calculée"),
+            @ApiResponse(responseCode = "404", description = "Code promo introuvable ou invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> validateAndCalculateDiscount(
+            @RequestParam String code,
+            @RequestParam BigDecimal subtotal) {
+        try {
+            if (code == null || code.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Code promo requis"));
+            }
+            if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) < 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Sous-total invalide"));
+            }
+
+            Optional<Promotion> promoOpt = promotionService.findValidPromotionByCode(code);
+            if (promoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("error", "Code promo introuvable ou expiré"));
+            }
+
+            Promotion promo = promoOpt.get();
+            BigDecimal discountAmount = promotionService.calculateDiscount(subtotal, promo);
+            BigDecimal totalAfterDiscount = subtotal.subtract(discountAmount);
+            if (totalAfterDiscount.compareTo(BigDecimal.ZERO) < 0) {
+                totalAfterDiscount = BigDecimal.ZERO;
+            }
+
+            PromotionValidationResponse response = new PromotionValidationResponse(
+                    promo.getCode(),
+                    discountAmount,
+                    subtotal,
+                    totalAfterDiscount);
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return handleException(e);
         }
