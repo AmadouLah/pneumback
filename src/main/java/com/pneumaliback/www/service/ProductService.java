@@ -22,6 +22,8 @@ import com.pneumaliback.www.repository.CartItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,13 @@ public class ProductService {
 
     public Page<Product> listActive(Pageable pageable) {
         return productRepository.findByActiveTrue(pageable);
+    }
+
+    public List<Product> latestActive(int limit) {
+        int size = Math.max(1, Math.min(limit, 12));
+        return productRepository.findByActiveTrue(
+                PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
     }
 
     public Page<Product> findWithFilters(Category category,
