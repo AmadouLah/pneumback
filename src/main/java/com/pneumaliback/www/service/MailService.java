@@ -1,11 +1,18 @@
 package com.pneumaliback.www.service;
 
+import com.pneumaliback.www.entity.Influenceur;
+import com.pneumaliback.www.entity.Promotion;
+import com.pneumaliback.www.enums.PromotionType;
 import com.pneumaliback.www.service.mail.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Service unifié pour l'envoi d'emails
@@ -271,6 +278,59 @@ public class MailService {
     }
 
     @Async
+    public void sendInfluencerPromotionAssigned(Influenceur influenceur, Promotion promotion) {
+        if (influenceur == null || promotion == null || influenceur.getUser() == null) {
+            log.warn("Impossible d'envoyer l'email de code promo : influenceur ou promotion invalide");
+            return;
+        }
+
+        String toEmail = influenceur.getUser().getEmail();
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            log.warn("Aucune adresse email pour l'influenceur {}", influenceur.getId());
+            return;
+        }
+
+        String firstName = influenceur.getUser().getFirstName();
+        String greeting = (firstName != null && !firstName.trim().isEmpty()) ? "Bonjour " + firstName + ","
+                : "Bonjour,";
+        String subject = "PneuMali - Nouveau code promotionnel attribué";
+
+        String reductionLabel = promotion.getType() == PromotionType.FIXED_AMOUNT
+                ? "Montant de réduction offert"
+                : "Réduction offerte à votre communauté";
+        String reductionValue = formatPromotionDiscount(promotion);
+        String validityValue = formatPromotionValidity(promotion.getStartDate(), promotion.getEndDate());
+        String supportEmail = resolveSupportEmail();
+
+        StringBuilder content = new StringBuilder()
+                .append("Félicitations 🎉 ! Un nouveau code promo vient de vous être attribué dans le cadre du programme d’affiliation PneuMali.<br><br>")
+                .append("Voici les détails de votre code :<br>")
+                .append("🔹 <strong>Code promo :</strong> ").append(promotion.getCode()).append("<br>")
+                .append("🔹 <strong>").append(reductionLabel).append(" :</strong> ").append(reductionValue)
+                .append("<br>")
+                .append("🔹 <strong>Validité :</strong> ").append(validityValue).append("<br><br>")
+                .append("Vous pouvez partager ce code avec votre communauté. ")
+                .append("Chaque achat effectué avec votre code sera automatiquement relié à votre compte, et vos commissions seront calculées en conséquence.<br><br>")
+                .append("Suivez les performances de votre code (ventes, clics, commissions, etc.) depuis votre espace influenceur.<br><br>")
+                .append("Merci de faire partie de la communauté PneuMali 🙌<br><br>")
+                .append("Support : ").append(supportEmail);
+
+        String textBody = (greeting + "\n\n"
+                + "Félicitations ! Un nouveau code promo vient de vous être attribué dans le cadre du programme d’affiliation PneuMali.\n\n"
+                + "Code promo : " + promotion.getCode() + "\n"
+                + reductionLabel + " : " + reductionValue + "\n"
+                + "Validité : " + validityValue + "\n\n"
+                + "Vous pouvez partager ce code avec votre communauté.\n"
+                + "Chaque achat effectué avec votre code sera automatiquement relié à votre compte, et vos commissions seront calculées en conséquence.\n\n"
+                + "Suivez les performances de votre code depuis votre espace influenceur.\n\n"
+                + "Merci de faire partie de la communauté PneuMali 🙌\n"
+                + "Support : " + supportEmail);
+
+        String htmlBody = buildEmailHtml(greeting, content.toString(), null, null);
+        sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "nouveau code promo influenceur");
+    }
+
+    @Async
     public void sendWelcomeEmail(String toEmail, String firstName, String resetToken) {
         if (toEmail == null || toEmail.trim().isEmpty() || resetToken == null || resetToken.trim().isEmpty()) {
             log.warn("Paramètres email invalides pour l'email de bienvenue");
@@ -279,7 +339,7 @@ public class MailService {
 
         String subject = "Bienvenue sur PneuMali - Définissez votre mot de passe";
         String greeting = firstName != null && !firstName.trim().isEmpty() ? "Bonjour " + firstName + "," : "Bonjour,";
-        String baseUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+        String baseUrl = normalizeFrontendUrl();
         String resetLink = baseUrl + "/auth/set-password?token=" + resetToken + "&email=" + toEmail;
 
         String content = "Bienvenue dans l'équipe PneuMali en tant qu'influenceur !<br><br>"
@@ -297,5 +357,47 @@ public class MailService {
 
         String htmlBody = buildEmailHtml(greeting, content, "Définir mon mot de passe", resetLink);
         sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "bienvenue influenceur");
+    }
+
+    private String formatPromotionDiscount(Promotion promotion) {
+        if (promotion.getType() == PromotionType.FIXED_AMOUNT) {
+            BigDecimal amount = promotion.getDiscountAmount() != null ? promotion.getDiscountAmount() : BigDecimal.ZERO;
+            return formatCurrencyXof(amount);
+        }
+
+        BigDecimal percentage = promotion.getDiscountPercentage() != null ? promotion.getDiscountPercentage()
+                : BigDecimal.ZERO;
+        return percentage.stripTrailingZeros().toPlainString() + "%";
+    }
+
+    private String formatPromotionValidity(LocalDate startDate, LocalDate endDate) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String start = startDate != null ? startDate.format(formatter) : "immédiatement";
+        if (endDate == null) {
+            return "à partir du " + start + " (sans date de fin)";
+        }
+        return "du " + start + " au " + endDate.format(formatter);
+    }
+
+    private String formatCurrencyXof(BigDecimal amount) {
+        BigDecimal safeAmount = amount != null ? amount : BigDecimal.ZERO;
+        return safeAmount.stripTrailingZeros().toPlainString() + " XOF";
+    }
+
+    private String normalizeFrontendUrl() {
+        if (frontendUrl == null || frontendUrl.isBlank()) {
+            return "https://pneumali.com";
+        }
+        return frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+    }
+
+    private String resolveSupportEmail() {
+        if (contactEmail != null && !contactEmail.isBlank()) {
+            return contactEmail.trim();
+        }
+        if (adminEmails != null && !adminEmails.isBlank()) {
+            return adminEmails.split(",")[0].trim();
+        }
+        return DEFAULT_CONTACT_EMAIL;
     }
 }

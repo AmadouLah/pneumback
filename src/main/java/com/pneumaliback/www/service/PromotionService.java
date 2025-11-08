@@ -26,6 +26,7 @@ public class PromotionService {
     private final PromotionRepository promotionRepository;
     private final InfluenceurService influenceurService;
     private final InfluenceurRepository influenceurRepository;
+    private final MailService mailService;
 
     public Optional<Promotion> findValidByCode(String code) {
         if (code == null || code.isBlank())
@@ -95,7 +96,9 @@ public class PromotionService {
             p.setInfluenceur(inf);
         }
 
-        return toResponse(promotionRepository.save(p));
+        Promotion savedPromotion = promotionRepository.save(p);
+        notifyInfluencerAssignment(savedPromotion);
+        return toResponse(savedPromotion);
     }
 
     public List<PromotionResponse> findAll() {
@@ -113,6 +116,8 @@ public class PromotionService {
     public PromotionResponse update(Long id, UpdatePromotionRequest request) {
         Promotion promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Promotion introuvable"));
+
+        Influenceur previousInfluenceur = promotion.getInfluenceur();
 
         if (request.code() != null && !request.code().isBlank()) {
             String code = request.code().trim();
@@ -178,7 +183,12 @@ public class PromotionService {
             promotion.setInfluenceur(influenceur);
         }
 
-        return toResponse(promotionRepository.save(promotion));
+        Promotion savedPromotion = promotionRepository.save(promotion);
+        if (shouldNotifyInfluenceur(previousInfluenceur, savedPromotion.getInfluenceur())) {
+            notifyInfluencerAssignment(savedPromotion);
+        }
+
+        return toResponse(savedPromotion);
     }
 
     @Transactional
@@ -278,6 +288,23 @@ public class PromotionService {
             return base;
         }
         return discount;
+    }
+
+    private void notifyInfluencerAssignment(Promotion promotion) {
+        if (promotion == null || promotion.getInfluenceur() == null) {
+            return;
+        }
+        mailService.sendInfluencerPromotionAssigned(promotion.getInfluenceur(), promotion);
+    }
+
+    private boolean shouldNotifyInfluenceur(Influenceur previous, Influenceur current) {
+        if (current == null) {
+            return false;
+        }
+        if (previous == null) {
+            return true;
+        }
+        return !previous.getId().equals(current.getId());
     }
 
     private PromotionResponse toResponse(Promotion promotion) {
