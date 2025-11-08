@@ -29,4 +29,6 @@ public interface VehicleTypeRepository extends JpaRepository<VehicleType, Long> 
     long countProductsByVehicleTypeId(@Param("vehicleTypeId") Long vehicleTypeId);
 
     Optional<VehicleType> findByNameIgnoreCaseAndCategory(String name, Category category);
+
+    long countByCategoryId(Long categoryId);
 }

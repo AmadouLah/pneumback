@@ -2,17 +2,19 @@ package com.pneumaliback.www.service;
 
 import com.pneumaliback.www.entity.Category;
 import com.pneumaliback.www.repository.CategoryRepository;
+import com.pneumaliback.www.repository.VehicleTypeRepository;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final VehicleTypeRepository vehicleTypeRepository;
 
     public List<Category> listAll() {
         return categoryRepository.findAll();
@@ -46,11 +48,26 @@ public class CategoryService {
                 .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
 
         long productCount = categoryRepository.countAllProductsInCategory(id);
-        if (productCount > 0) {
-            throw new IllegalArgumentException("Impossible de supprimer cette catégorie car elle contient "
-                    + productCount + " produit(s). Veuillez d'abord supprimer ou réaffecter les produits.");
+        long vehicleTypeCount = vehicleTypeRepository.countByCategoryId(id);
+
+        if (productCount > 0 || vehicleTypeCount > 0) {
+            throw new IllegalArgumentException(buildBlockingMessage(productCount, vehicleTypeCount));
         }
 
         categoryRepository.delete(category);
+    }
+
+    private String buildBlockingMessage(long productCount, long vehicleTypeCount) {
+        List<String> reasons = new ArrayList<>();
+        if (productCount > 0) {
+            reasons.add(productCount + (productCount > 1 ? " produits" : " produit"));
+        }
+        if (vehicleTypeCount > 0) {
+            reasons.add(vehicleTypeCount + (vehicleTypeCount > 1 ? " types de véhicule" : " type de véhicule"));
+        }
+
+        String detail = String.join(" et ", reasons);
+        return "Impossible de supprimer cette catégorie car elle est liée à " + detail
+                + ". Veuillez d'abord réaffecter ou supprimer ces éléments.";
     }
 }
