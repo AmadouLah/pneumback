@@ -144,6 +144,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.GET, "/api/products/popular").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/brands").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/dimensions").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/tire-dimensions/**").permitAll()
                                 .requestMatchers("/api/admin/**").hasAnyRole(ADMIN_ROLES)
                                 .requestMatchers("/api/influenceur/**").hasRole(Role.INFLUENCEUR.name())
                                 .anyRequest().authenticated();
