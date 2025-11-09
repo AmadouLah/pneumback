@@ -137,6 +137,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                 // Consultation des produits accessible publiquement (GET uniquement)
                                 .requestMatchers(HttpMethod.GET, "/api/products/active").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/products/latest").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/search").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/filter").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
