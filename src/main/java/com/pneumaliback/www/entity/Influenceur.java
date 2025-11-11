@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
@@ -20,6 +21,9 @@ public class Influenceur extends EntiteAuditable {
 
     @Column(length = 50, unique = true)
     private String promoCode;
+
+    @Column(nullable = false)
+    private boolean archived = false;
 
     @OneToOne
     private User user;

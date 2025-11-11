@@ -24,7 +24,7 @@ public class StorageController {
     private final StorageService storageService;
 
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @Operation(summary = "Upload un fichier", description = "Upload un fichier vers Supabase Storage")
     public ResponseEntity<?> uploadFile(
             @RequestParam("file") MultipartFile file,
@@ -50,7 +50,7 @@ public class StorageController {
     }
 
     @DeleteMapping("/delete")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @Operation(summary = "Supprimer un fichier", description = "Supprime un fichier de Supabase Storage")
     public ResponseEntity<?> deleteFile(@RequestParam("path") String filePath) {
         try {

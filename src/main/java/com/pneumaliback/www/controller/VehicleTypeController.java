@@ -36,7 +36,7 @@ public class VehicleTypeController {
 
     @GetMapping
     @Operation(summary = "Lister tous les types de véhicules (admin)", description = "Liste tous les types, y compris inactifs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = VehicleType.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
@@ -80,7 +80,7 @@ public class VehicleTypeController {
 
     @PostMapping
     @Operation(summary = "Créer un type de véhicule")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Type créé", content = @Content(mediaType = "application/json", schema = @Schema(implementation = VehicleType.class))),
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
@@ -96,7 +96,7 @@ public class VehicleTypeController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour un type de véhicule")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Type mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = VehicleType.class))),
             @ApiResponse(responseCode = "404", description = "Type non trouvé", content = @Content(mediaType = "application/json")),
@@ -113,7 +113,7 @@ public class VehicleTypeController {
 
     @PutMapping("/{id}/active")
     @Operation(summary = "Activer/Désactiver un type de véhicule")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Statut mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = VehicleType.class))),
             @ApiResponse(responseCode = "404", description = "Type non trouvé", content = @Content(mediaType = "application/json")),
@@ -130,7 +130,7 @@ public class VehicleTypeController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer un type de véhicule")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Type supprimé"),
             @ApiResponse(responseCode = "404", description = "Type non trouvé", content = @Content(mediaType = "application/json")),

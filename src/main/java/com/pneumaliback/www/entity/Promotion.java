@@ -42,6 +42,9 @@ public class Promotion extends EntiteAuditable {
     @Column(nullable = false)
     private LocalDate endDate;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
     @ManyToOne
     @JoinColumn(name = "influenceur_id")
     private Influenceur influenceur;

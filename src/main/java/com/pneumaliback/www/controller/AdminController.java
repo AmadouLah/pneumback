@@ -36,7 +36,7 @@ import java.util.Map;
 @Slf4j
 @Tag(name = "Administration", description = "API d'administration - Accès admin uniquement")
 @SecurityRequirement(name = "bearerAuth")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
 @CrossOrigin(origins = "*")
 public class AdminController {
 

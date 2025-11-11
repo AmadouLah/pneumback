@@ -36,7 +36,7 @@ public class CategoryController {
 
     @GetMapping
     @Operation(summary = "Lister toutes les catégories (admin)", description = "Liste toutes les catégories, y compris inactives")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Category.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
@@ -65,7 +65,7 @@ public class CategoryController {
 
     @PostMapping
     @Operation(summary = "Créer une catégorie")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Catégorie créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Category.class))),
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
@@ -81,7 +81,7 @@ public class CategoryController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour une catégorie")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Catégorie mise à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Category.class))),
             @ApiResponse(responseCode = "404", description = "Catégorie non trouvée", content = @Content(mediaType = "application/json")),
@@ -98,7 +98,7 @@ public class CategoryController {
 
     @PutMapping("/{id}/active")
     @Operation(summary = "Activer/Désactiver une catégorie")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Statut mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Category.class))),
             @ApiResponse(responseCode = "404", description = "Catégorie non trouvée", content = @Content(mediaType = "application/json")),
@@ -115,7 +115,7 @@ public class CategoryController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer une catégorie")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Catégorie supprimée"),
             @ApiResponse(responseCode = "404", description = "Catégorie non trouvée", content = @Content(mediaType = "application/json")),

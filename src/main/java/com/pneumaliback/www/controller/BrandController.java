@@ -36,7 +36,7 @@ public class BrandController {
 
     @GetMapping
     @Operation(summary = "Lister toutes les marques (admin)", description = "Liste toutes les marques, y compris inactives")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Brand.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
@@ -65,7 +65,7 @@ public class BrandController {
 
     @PostMapping
     @Operation(summary = "Créer une marque")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Marque créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Brand.class))),
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
@@ -81,7 +81,7 @@ public class BrandController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour une marque")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Marque mise à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Brand.class))),
             @ApiResponse(responseCode = "404", description = "Marque non trouvée", content = @Content(mediaType = "application/json")),
@@ -98,7 +98,7 @@ public class BrandController {
 
     @PutMapping("/{id}/active")
     @Operation(summary = "Activer/Désactiver une marque")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Statut mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Brand.class))),
             @ApiResponse(responseCode = "404", description = "Marque non trouvée", content = @Content(mediaType = "application/json")),
@@ -115,7 +115,7 @@ public class BrandController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer une marque")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Marque supprimée"),
             @ApiResponse(responseCode = "404", description = "Marque non trouvée", content = @Content(mediaType = "application/json")),

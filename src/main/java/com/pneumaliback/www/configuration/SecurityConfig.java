@@ -72,6 +72,10 @@ public class SecurityConfig {
                         Role.DEVELOPER.name()
         };
 
+        private static final String[] DEVELOPER_ROLES = {
+                        Role.DEVELOPER.name()
+        };
+
         // ========== Dépendances ==========
 
         private final JwtAuthenticationFilter jwtAuthFilter;
@@ -145,6 +149,9 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.GET, "/api/products/brands").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/products/dimensions").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/tire-dimensions/**").permitAll()
+                                .requestMatchers("/api/admin/influenceurs/**").hasAnyRole(ADMIN_ROLES)
+                                .requestMatchers(HttpMethod.DELETE, "/api/admin/influenceurs/**")
+                                .hasAnyRole(DEVELOPER_ROLES)
                                 .requestMatchers("/api/admin/**").hasAnyRole(ADMIN_ROLES)
                                 .requestMatchers("/api/influenceur/**").hasRole(Role.INFLUENCEUR.name())
                                 .anyRequest().authenticated();

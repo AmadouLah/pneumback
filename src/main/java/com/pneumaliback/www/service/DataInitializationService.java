@@ -45,7 +45,7 @@ public class DataInitializationService implements CommandLineRunner {
         ensureAuthProviderColumn();
         List<DefaultUser> defaults = Arrays.asList(
                 new DefaultUser(
-                        "admin@pneumali.ml",
+                        "contactlandoure@gmail.com",
                         "Admin@2024!",
                         "Admin",
                         "PneuMali",
@@ -54,10 +54,10 @@ public class DataInitializationService implements CommandLineRunner {
                 new DefaultUser(
                         "amadoulandoure004@gmail.com",
                         "F4@655#&3%@&27^!3*3o",
-                        "Admin",
-                        "PneuMali",
+                        "Amadou",
+                        "Landouré",
                         "+22370911112",
-                        Role.ADMIN),
+                        Role.DEVELOPER),
                 new DefaultUser(
                         "dev@pneumali.ml",
                         "Dev@2024!",
@@ -66,7 +66,7 @@ public class DataInitializationService implements CommandLineRunner {
                         "+22312345677",
                         Role.DEVELOPER),
                 new DefaultUser(
-                        "contactlandoure@gmail.com",
+                        "admin@pneumali.ml",
                         "Client#2024!",
                         "Client",
                         "Demo",

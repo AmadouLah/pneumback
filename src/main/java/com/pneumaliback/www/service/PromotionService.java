@@ -35,6 +35,7 @@ public class PromotionService {
         LocalDate today = LocalDate.now();
         return promotionRepository.findAll().stream()
                 .filter(p -> normalized.equalsIgnoreCase(p.getCode()))
+                .filter(Promotion::isActive)
                 .filter(p -> (p.getStartDate() == null || !today.isBefore(p.getStartDate())))
                 .filter(p -> (p.getEndDate() == null || !today.isAfter(p.getEndDate())))
                 .findFirst();
@@ -47,6 +48,7 @@ public class PromotionService {
         return influenceurService.findByPromoCode(code)
                 .flatMap(inf -> promotionRepository.findAll().stream()
                         .filter(p -> p.getInfluenceur() != null && p.getInfluenceur().getId().equals(inf.getId()))
+                        .filter(Promotion::isActive)
                         .filter(p -> (p.getStartDate() == null || !today.isBefore(p.getStartDate())))
                         .filter(p -> (p.getEndDate() == null || !today.isAfter(p.getEndDate())))
                         .findFirst());
@@ -89,6 +91,8 @@ public class PromotionService {
             }
             default -> throw new IllegalArgumentException("Type de promotion non pris en charge pour la création");
         }
+
+        p.setActive(true);
 
         if (dto.influenceurId() != null) {
             Influenceur inf = influenceurRepository.findById(dto.influenceurId())
@@ -222,7 +226,7 @@ public class PromotionService {
      * Calcule le montant de la réduction pour une promotion donnée et un sous-total
      */
     public BigDecimal calculateDiscount(BigDecimal subtotal, Promotion promo) {
-        if (promo == null || subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+        if (promo == null || !promo.isActive() || subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
 
@@ -325,6 +329,7 @@ public class PromotionService {
                 promotion.getDiscountAmount(),
                 promotion.getStartDate(),
                 promotion.getEndDate(),
+                promotion.isActive(),
                 influenceurInfo);
     }
 }

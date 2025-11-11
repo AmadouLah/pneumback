@@ -36,7 +36,7 @@ public class TireConditionController {
 
     @GetMapping
     @Operation(summary = "Lister tous les états de pneus (admin)", description = "Liste tous les états, y compris inactifs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TireCondition.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
@@ -65,7 +65,7 @@ public class TireConditionController {
 
     @PostMapping
     @Operation(summary = "Créer un état de pneu")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "État créé", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TireCondition.class))),
             @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
@@ -81,7 +81,7 @@ public class TireConditionController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour un état de pneu")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "État mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TireCondition.class))),
             @ApiResponse(responseCode = "404", description = "État non trouvé", content = @Content(mediaType = "application/json")),
@@ -98,7 +98,7 @@ public class TireConditionController {
 
     @PutMapping("/{id}/active")
     @Operation(summary = "Activer/Désactiver un état de pneu")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Statut mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TireCondition.class))),
             @ApiResponse(responseCode = "404", description = "État non trouvé", content = @Content(mediaType = "application/json")),
@@ -115,7 +115,7 @@ public class TireConditionController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer un état de pneu")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "État supprimé"),
             @ApiResponse(responseCode = "404", description = "État non trouvé", content = @Content(mediaType = "application/json")),

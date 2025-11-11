@@ -95,7 +95,7 @@ public class ProductController {
 
         @GetMapping
         @Operation(summary = "Lister tous les produits (admin)", description = "Liste tous les produits, y compris inactifs")
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Liste récupérée"),
                         @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
@@ -117,7 +117,7 @@ public class ProductController {
 
         @PostMapping
         @Operation(summary = "Créer un produit")
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Produit créé", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Product.class))),
                         @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
@@ -188,7 +188,7 @@ public class ProductController {
 
         @PutMapping("/{id}")
         @Operation(summary = "Mettre à jour un produit")
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Produit mis à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Product.class))),
                         @ApiResponse(responseCode = "404", description = "Produit introuvable", content = @Content(mediaType = "application/json")),
@@ -272,7 +272,7 @@ public class ProductController {
 
         @DeleteMapping("/{id}")
         @Operation(summary = "Supprimer un produit")
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Produit supprimé"),
                         @ApiResponse(responseCode = "404", description = "Produit introuvable", content = @Content(mediaType = "application/json")),

@@ -61,7 +61,7 @@ public class DeliveryController {
 
     @PostMapping
     @Operation(summary = "Créer une livraison pour une commande")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Livraison créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Delivery.class))),
             @ApiResponse(responseCode = "400", description = "Paramètres invalides", content = @Content(mediaType = "application/json")),

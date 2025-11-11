@@ -125,7 +125,7 @@ public class PromotionController {
 
     @PostMapping
     @Operation(summary = "Créer une promotion")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Promotion créée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
@@ -143,7 +143,7 @@ public class PromotionController {
 
     @GetMapping("/admin")
     @Operation(summary = "Lister toutes les promotions (admin)", description = "Récupère la liste de toutes les promotions")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste récupérée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
@@ -159,7 +159,7 @@ public class PromotionController {
 
     @GetMapping("/admin/{id}")
     @Operation(summary = "Récupérer une promotion par ID (admin)")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Promotion trouvée", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
@@ -178,7 +178,7 @@ public class PromotionController {
 
     @PutMapping("/admin/{id}")
     @Operation(summary = "Mettre à jour une promotion (admin)")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Promotion mise à jour", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PromotionResponse.class))),
@@ -197,7 +197,7 @@ public class PromotionController {
 
     @DeleteMapping("/admin/{id}")
     @Operation(summary = "Supprimer une promotion (admin)")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Promotion supprimée"),
