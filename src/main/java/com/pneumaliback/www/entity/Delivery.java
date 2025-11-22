@@ -1,6 +1,7 @@
 package com.pneumaliback.www.entity;
 
 import com.pneumaliback.www.enums.DeliveryStatus;
+import com.pneumaliback.www.entity.User;
 
 import java.math.BigDecimal;
 import jakarta.persistence.Column;
@@ -16,7 +17,7 @@ import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "deliveries", indexes = {
-    @Index(name = "idx_deliveries_zone", columnList = "zone")
+        @Index(name = "idx_deliveries_zone", columnList = "zone")
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -40,4 +41,13 @@ public class Delivery extends EntiteAuditable {
 
     @ManyToOne
     private Address address;
+
+    @ManyToOne
+    private User assignedLivreur;
+
+    @Column(name = "assigned_at")
+    private java.time.OffsetDateTime assignedAt;
+
+    @Column(name = "delivered_at")
+    private java.time.OffsetDateTime deliveredAt;
 }

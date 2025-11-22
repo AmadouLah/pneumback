@@ -59,13 +59,6 @@ public class DataInitializationService implements CommandLineRunner {
                         "+22370911112",
                         Role.DEVELOPER),
                 new DefaultUser(
-                        "dev@pneumali.ml",
-                        "Dev@2024!",
-                        "Developpeur",
-                        "PneuMali",
-                        "+22312345677",
-                        Role.DEVELOPER),
-                new DefaultUser(
                         "admin@pneumali.ml",
                         "Client#2024!",
                         "Client",
@@ -78,7 +71,14 @@ public class DataInitializationService implements CommandLineRunner {
                         "Influenceur",
                         "Demo",
                         "+22312345680",
-                        Role.INFLUENCEUR));
+                        Role.INFLUENCEUR),
+                new DefaultUser(
+                        "livreur@pneumali.ml",
+                        "Livreur@2024!",
+                        "Livreur",
+                        "PneuMali",
+                        "+22312345681",
+                        Role.LIVREUR));
 
         int created = 0;
         int updated = 0;
@@ -136,7 +136,7 @@ public class DataInitializationService implements CommandLineRunner {
 
                 // Nettoyage de l'état OTP / vérification UNIQUEMENT pour les comptes par défaut
                 // ADMIN/DEV
-                if ((du.role() == Role.ADMIN || du.role() == Role.DEVELOPER) &&
+                if (du.role().hasAdminPrivileges() &&
                         (existing.getVerificationCode() != null || existing.getVerificationExpiry() != null
                                 || existing.getVerificationSentAt() != null
                                 || existing.getOtpAttempts() != null || existing.getOtpLockedUntil() != null

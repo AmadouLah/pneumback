@@ -22,11 +22,14 @@ import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_orders_promotion_id", columnList = "promotion_id")
+        @Index(name = "idx_orders_promotion_id", columnList = "promotion_id")
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Order extends EntiteAuditable {
+
+    @Column(name = "order_number", unique = true, length = 32)
+    private String orderNumber;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -43,7 +46,7 @@ public class Order extends EntiteAuditable {
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private Delivery delivery;
-    
+
     @ManyToOne
     @JoinColumn(name = "promotion_id")
     private Promotion promotion;

@@ -2,6 +2,8 @@ package com.pneumaliback.www.service;
 
 import com.pneumaliback.www.entity.Influenceur;
 import com.pneumaliback.www.entity.Promotion;
+import com.pneumaliback.www.entity.QuoteRequest;
+import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.enums.PromotionType;
 import com.pneumaliback.www.service.mail.EmailSender;
 import lombok.RequiredArgsConstructor;
@@ -399,5 +401,193 @@ public class MailService {
             return adminEmails.split(",")[0].trim();
         }
         return DEFAULT_CONTACT_EMAIL;
+    }
+
+    @Async
+    public void sendQuoteRequestConfirmation(User user, QuoteRequest request) {
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+        String subject = "PneuMali - Demande de devis " + request.getRequestNumber();
+        String greeting = buildGreeting(user);
+        String content = """
+                Nous avons bien reçu votre demande de devis. Notre équipe va l'analyser et vous fera parvenir une proposition détaillée dans les meilleurs délais.<br><br>
+                <strong>Numéro de demande :</strong> %s<br>
+                Date : %s<br><br>
+                Vous recevrez un email dès que le devis sera disponible dans votre espace client.
+                """
+                .formatted(request.getRequestNumber(),
+                        request.getCreatedAt().toLocalDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        sendHtmlEmailSafely(user.getEmail(), subject, buildEmailHtml(greeting, content, null, null), content,
+                "confirmation devis");
+    }
+
+    @Async
+    public void notifyAdminsNewQuoteRequest(QuoteRequest request) {
+        if (adminEmails == null || adminEmails.isBlank()) {
+            return;
+        }
+        String subject = "Nouvelle demande de devis " + request.getRequestNumber();
+        String body = """
+                Bonjour,
+
+                Une nouvelle demande de devis vient d'être soumise sur PneuMali.
+
+                Numéro : %s
+                Client : %s %s (%s)
+                Date : %s
+
+                Rendez-vous dans le backoffice pour préparer le devis.
+                """.formatted(request.getRequestNumber(),
+                safe(request.getUser().getFirstName()),
+                safe(request.getUser().getLastName()),
+                request.getUser().getEmail(),
+                request.getCreatedAt().toLocalDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+
+        for (String email : adminEmails.split(",")) {
+            String trimmed = email.trim();
+            if (!trimmed.isEmpty()) {
+                sendEmailSafely(trimmed, subject, body, "notification devis");
+            }
+        }
+    }
+
+    @Async
+    public void sendQuoteReadyEmail(User user, QuoteRequest request, String frontendQuoteUrl) {
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+        String baseUrl = normalizeFrontendUrl();
+        String link = frontendQuoteUrl != null && !frontendQuoteUrl.isBlank()
+                ? frontendQuoteUrl
+                : baseUrl + "/devis/" + request.getRequestNumber();
+        String subject = "Votre devis " + request.getQuoteNumber() + " est disponible";
+        String greeting = buildGreeting(user);
+        String content = """
+                Votre devis est maintenant prêt et disponible dans votre espace client.<br><br>
+                <strong>Numéro de devis :</strong> %s<br>
+                Total devis : %s<br>
+                Validité : %s<br><br>
+                Veuillez consulter et valider le devis afin de confirmer votre commande.
+                """.formatted(
+                request.getQuoteNumber(),
+                formatCurrencyXof(request.getTotalQuoted()),
+                request.getValidUntil() != null
+                        ? request.getValidUntil().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        : "7 jours");
+
+        String textBody = """
+                %s
+
+                Votre devis est disponible.
+
+                Numéro : %s
+                Total : %s
+                Validité : %s
+
+                Consulter le devis : %s
+
+                Merci pour votre confiance.
+                """.formatted(
+                greeting,
+                request.getQuoteNumber(),
+                formatCurrencyXof(request.getTotalQuoted()),
+                request.getValidUntil() != null
+                        ? request.getValidUntil().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        : "7 jours",
+                link);
+
+        String htmlBody = buildEmailHtml(greeting, content, "Consulter le devis", link);
+        sendHtmlEmailSafely(user.getEmail(), subject, htmlBody, textBody, "devis prêt");
+    }
+
+    @Async
+    public void notifyAdminsQuoteValidated(QuoteRequest request) {
+        if (adminEmails == null || adminEmails.isBlank()) {
+            return;
+        }
+        String subject = "Devis validé par le client - " + request.getQuoteNumber();
+        String body = """
+                Bonjour,
+
+                Le devis %s vient d'être validé électroniquement par le client %s %s.
+
+                Montant : %s
+                Date : %s
+                IP : %s
+
+                Merci de lancer la préparation et la livraison.
+                """.formatted(
+                request.getQuoteNumber(),
+                safe(request.getUser().getFirstName()),
+                safe(request.getUser().getLastName()),
+                formatCurrencyXof(request.getTotalQuoted()),
+                request.getValidatedAt() != null
+                        ? request.getValidatedAt().toLocalDateTime()
+                                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        : "-",
+                request.getValidatedIp() != null ? request.getValidatedIp() : "-");
+
+        for (String email : adminEmails.split(",")) {
+            String trimmed = email.trim();
+            if (!trimmed.isEmpty()) {
+                sendEmailSafely(trimmed, subject, body, "validation devis");
+            }
+        }
+    }
+
+    @Async
+    public void notifyLivreurAssignment(User livreur, QuoteRequest request) {
+        if (livreur == null || livreur.getEmail() == null || livreur.getEmail().isBlank()) {
+            return;
+        }
+        String subject = "Nouvelle livraison assignée - " + request.getQuoteNumber();
+        String greeting = buildGreeting(livreur);
+        String content = """
+                Une nouvelle livraison vient de vous être confiée.<br><br>
+                <strong>Devis :</strong> %s<br>
+                <strong>Client :</strong> %s %s (%s)<br>
+                <strong>Détails livraison :</strong><br>%s
+                """.formatted(
+                request.getQuoteNumber(),
+                safe(request.getUser().getFirstName()),
+                safe(request.getUser().getLastName()),
+                request.getUser().getEmail(),
+                request.getDeliveryDetails() != null ? request.getDeliveryDetails().replace("\n", "<br>")
+                        : "Non précisé");
+
+        sendHtmlEmailSafely(livreur.getEmail(), subject, buildEmailHtml(greeting, content, null, null), content,
+                "assignation livreur");
+    }
+
+    @Async
+    public void notifyQuoteDelivered(QuoteRequest request) {
+        if (request.getUser() == null || request.getUser().getEmail() == null
+                || request.getUser().getEmail().isBlank()) {
+            return;
+        }
+        String subject = "Confirmation de livraison - Devis " + request.getQuoteNumber();
+        String greeting = buildGreeting(request.getUser());
+        String content = """
+                Votre commande a été marquée comme livrée. Merci de votre confiance !
+                """;
+        sendHtmlEmailSafely(request.getUser().getEmail(), subject, buildEmailHtml(greeting, content, null, null),
+                content,
+                "confirmation livraison");
+    }
+
+    private String buildGreeting(User user) {
+        if (user == null) {
+            return "Bonjour,";
+        }
+        String firstName = safe(user.getFirstName());
+        if (!firstName.isBlank()) {
+            return "Bonjour " + firstName + ",";
+        }
+        return "Bonjour,";
+    }
+
+    private String safe(String value) {
+        return value != null ? value : "";
     }
 }

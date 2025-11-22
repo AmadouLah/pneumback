@@ -4,6 +4,7 @@ import com.pneumaliback.www.entity.Address;
 import com.pneumaliback.www.entity.Delivery;
 import com.pneumaliback.www.entity.Order;
 import com.pneumaliback.www.enums.DeliveryStatus;
+import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.repository.DeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,9 +20,11 @@ public class DeliveryService {
 
     // Simple quote logic; you can later back this by a Zone table/config
     public BigDecimal quoteShippingFee(String zone) {
-        if (zone == null || zone.isBlank()) return BigDecimal.ZERO;
+        if (zone == null || zone.isBlank())
+            return BigDecimal.ZERO;
         String z = zone.trim().toLowerCase();
-        if (z.contains("bamako")) return new BigDecimal("2000");
+        if (z.contains("bamako"))
+            return new BigDecimal("2000");
         return new BigDecimal("5000");
     }
 
@@ -39,6 +42,21 @@ public class DeliveryService {
     @Transactional
     public Delivery updateStatus(Delivery delivery, DeliveryStatus status) {
         delivery.setStatus(status);
+        return deliveryRepository.save(delivery);
+    }
+
+    @Transactional
+    public Delivery assignLivreur(Delivery delivery, User livreur) {
+        delivery.setAssignedLivreur(livreur);
+        delivery.setAssignedAt(java.time.OffsetDateTime.now());
+        delivery.setStatus(DeliveryStatus.IN_PROGRESS);
+        return deliveryRepository.save(delivery);
+    }
+
+    @Transactional
+    public Delivery markDelivered(Delivery delivery) {
+        delivery.setStatus(DeliveryStatus.DELIVERED);
+        delivery.setDeliveredAt(java.time.OffsetDateTime.now());
         return deliveryRepository.save(delivery);
     }
 }

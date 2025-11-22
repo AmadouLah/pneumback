@@ -22,6 +22,7 @@ public class CheckoutService {
     private final DeliveryService deliveryService;
     private final OrderService orderService;
     private final CartService cartService;
+    private final NumberSequenceService numberSequenceService;
 
     @Transactional
     public Order createOrder(User user, Address shippingAddress, String zone, String promoCode) {
@@ -35,6 +36,7 @@ public class CheckoutService {
         Order order = new Order();
         order.setUser(user);
         order.setStatus(OrderStatus.PENDING);
+        order.setOrderNumber(numberSequenceService.nextFormatted("ORDER", "CMD"));
         orderRepository.save(order);
 
         // Lignes de commande depuis le panier
@@ -58,7 +60,7 @@ public class CheckoutService {
                         .ifPresent(order::setPromotion);
             }
         }
- 
+
         // Livraison (zone + frais)
         BigDecimal fee = deliveryService.quoteShippingFee(zone);
         Delivery delivery = deliveryService.attachDelivery(order, shippingAddress, zone, fee);

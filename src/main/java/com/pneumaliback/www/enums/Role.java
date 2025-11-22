@@ -4,19 +4,20 @@ public enum Role {
     ADMIN("Administrateur"),
     CLIENT("Client"),
     INFLUENCEUR("Influenceur"),
-    DEVELOPER("Développeur");
-    
+    DEVELOPER("Développeur"),
+    LIVREUR("Livreur");
+
     private final String displayName;
-    
+
     Role(String displayName) {
         this.displayName = displayName;
     }
-    
+
     public String getDisplayName() {
         return displayName;
     }
-    
+
     public boolean hasAdminPrivileges() {
-        return this == ADMIN;
+        return this == ADMIN || this == DEVELOPER;
     }
 }

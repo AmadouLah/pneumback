@@ -47,24 +47,34 @@ public class StorageService {
 
         String extension = getFileExtension(originalFilename);
         String fileName = generateUniqueFileName(extension);
-        String filePath = folder != null && !folder.isBlank()
-                ? folder + "/" + fileName
-                : fileName;
+        return uploadBytes(file.getBytes(), fileName, folder, file.getContentType());
+    }
 
-        byte[] fileBytes = file.getBytes();
-        String contentType = file.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            contentType = "application/octet-stream";
+    public String uploadBytes(byte[] data, String fileName, String folder, String contentType) {
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("Le fichier est vide");
         }
+
+        String safeContentType = (contentType == null || contentType.isBlank())
+                ? "application/octet-stream"
+                : contentType;
+
+        String safeFileName = fileName != null && !fileName.isBlank()
+                ? fileName
+                : generateUniqueFileName(null);
+
+        String filePath = folder != null && !folder.isBlank()
+                ? folder + "/" + safeFileName
+                : safeFileName;
 
         String uploadUrl = String.format("%s/storage/v1/object/%s/%s", supabaseUrl, bucketName, filePath);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType(contentType));
+        headers.setContentType(MediaType.parseMediaType(safeContentType));
         headers.set("Authorization", "Bearer " + serviceRoleKey);
         headers.set("apikey", serviceRoleKey);
 
-        HttpEntity<byte[]> requestEntity = new HttpEntity<>(fileBytes, headers);
+        HttpEntity<byte[]> requestEntity = new HttpEntity<>(data, headers);
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(

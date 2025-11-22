@@ -6,7 +6,9 @@ import com.pneumaliback.www.enums.DeliveryStatus;
 import com.pneumaliback.www.repository.DeliveryRepository;
 import com.pneumaliback.www.repository.AddressRepository;
 import com.pneumaliback.www.repository.OrderRepository;
+import com.pneumaliback.www.repository.UserRepository;
 import com.pneumaliback.www.service.DeliveryService;
+import com.pneumaliback.www.enums.Role;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import com.pneumaliback.www.dto.AssignDeliveryRequest;
 import com.pneumaliback.www.dto.DeliveryCreateDTO;
 
 @RestController
@@ -32,6 +35,7 @@ public class DeliveryController {
     private final DeliveryRepository deliveryRepository;
     private final AddressRepository addressRepository;
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
 
     private ResponseEntity<?> handleException(Exception e) {
         if (e instanceof IllegalArgumentException) {
@@ -41,7 +45,8 @@ public class DeliveryController {
             }
             return ResponseEntity.badRequest().body(java.util.Map.of("error", msg));
         }
-        return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
+        return ResponseEntity.internalServerError()
+                .body(java.util.Map.of("error", "Erreur interne du serveur", "message", e.getMessage()));
     }
 
     @GetMapping("/quote")
@@ -77,7 +82,8 @@ public class DeliveryController {
                     .orElseThrow(() -> new IllegalArgumentException("Commande introuvable"));
             var address = addressRepository.findById(dto.addressId())
                     .orElseThrow(() -> new IllegalArgumentException("Adresse introuvable"));
-            BigDecimal fee = dto.shippingFee() != null ? dto.shippingFee() : deliveryService.quoteShippingFee(dto.zone());
+            BigDecimal fee = dto.shippingFee() != null ? dto.shippingFee()
+                    : deliveryService.quoteShippingFee(dto.zone());
             Delivery d = deliveryService.attachDelivery(order, address, dto.zone(), fee);
             return ResponseEntity.ok(d);
         } catch (Exception e) {
@@ -102,5 +108,24 @@ public class DeliveryController {
             return handleException(e);
         }
     }
-}
 
+    @PostMapping("/{deliveryId}/assign")
+    @PreAuthorize("hasAnyRole('ADMIN','DEVELOPER')")
+    @Operation(summary = "Assigner un livreur à une livraison")
+    public ResponseEntity<?> assignLivreur(
+            @PathVariable Long deliveryId,
+            @RequestBody @jakarta.validation.Valid AssignDeliveryRequest payload) {
+        try {
+            Delivery delivery = deliveryRepository.findById(deliveryId)
+                    .orElseThrow(() -> new IllegalArgumentException("Livraison introuvable"));
+            var livreur = userRepository.findById(payload.livreurId())
+                    .orElseThrow(() -> new IllegalArgumentException("Livreur introuvable"));
+            if (livreur.getRole() == null || livreur.getRole() != Role.LIVREUR) {
+                throw new IllegalArgumentException("L'utilisateur sélectionné n'est pas un livreur.");
+            }
+            return ResponseEntity.ok(deliveryService.assignLivreur(delivery, livreur));
+        } catch (Exception e) {
+            return handleException(e);
+        }
+    }
+}

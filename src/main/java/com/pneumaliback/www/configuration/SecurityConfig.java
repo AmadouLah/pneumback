@@ -152,6 +152,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/admin/influenceurs/**").hasAnyRole(ADMIN_ROLES)
                                 .requestMatchers(HttpMethod.DELETE, "/api/admin/influenceurs/**")
                                 .hasAnyRole(DEVELOPER_ROLES)
+                                .requestMatchers("/api/livreur/**").hasRole(Role.LIVREUR.name())
                                 .requestMatchers("/api/admin/**").hasAnyRole(ADMIN_ROLES)
                                 .requestMatchers("/api/influenceur/**").hasRole(Role.INFLUENCEUR.name())
                                 .anyRequest().authenticated();
