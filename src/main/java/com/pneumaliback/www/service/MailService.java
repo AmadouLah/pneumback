@@ -1,8 +1,10 @@
 package com.pneumaliback.www.service;
 
+import com.pneumaliback.www.entity.Address;
 import com.pneumaliback.www.entity.Influenceur;
 import com.pneumaliback.www.entity.Promotion;
 import com.pneumaliback.www.entity.QuoteRequest;
+import com.pneumaliback.www.entity.QuoteRequestItem;
 import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.enums.PromotionType;
 import com.pneumaliback.www.service.mail.EmailSender;
@@ -541,23 +543,266 @@ public class MailService {
         if (livreur == null || livreur.getEmail() == null || livreur.getEmail().isBlank()) {
             return;
         }
-        String subject = "Nouvelle livraison assignée - " + request.getQuoteNumber();
-        String greeting = buildGreeting(livreur);
-        String content = """
-                Une nouvelle livraison vient de vous être confiée.<br><br>
-                <strong>Devis :</strong> %s<br>
-                <strong>Client :</strong> %s %s (%s)<br>
-                <strong>Détails livraison :</strong><br>%s
-                """.formatted(
-                request.getQuoteNumber(),
-                safe(request.getUser().getFirstName()),
-                safe(request.getUser().getLastName()),
-                request.getUser().getEmail(),
-                request.getDeliveryDetails() != null ? request.getDeliveryDetails().replace("\n", "<br>")
-                        : "Non précisé");
+        if (request == null || request.getUser() == null) {
+            log.warn("Impossible d'envoyer l'email d'assignation: devis ou client manquant");
+            return;
+        }
 
-        sendHtmlEmailSafely(livreur.getEmail(), subject, buildEmailHtml(greeting, content, null, null), content,
-                "assignation livreur");
+        String subject = "Nouvelle livraison assignée - Devis " + safe(request.getQuoteNumber());
+        String greeting = buildGreeting(livreur);
+        String content = buildLivreurAssignmentContent(request);
+
+        sendHtmlEmailSafely(livreur.getEmail(), subject, buildEmailHtml(greeting, content, null, null),
+                buildLivreurAssignmentTextContent(request), "assignation livreur");
+    }
+
+    private String buildLivreurAssignmentContent(QuoteRequest request) {
+        User client = request.getUser();
+        StringBuilder content = new StringBuilder();
+
+        content.append("<p style=\"font-size: 16px; line-height: 1.6; color: #333333;\">");
+        content.append("Une nouvelle livraison vous a été assignée. Veuillez trouver ci-dessous tous les détails nécessaires pour effectuer la livraison.");
+        content.append("</p><br>");
+
+        // Informations du devis
+        content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+        content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📋 Informations du devis</h3>");
+        content.append("<p style=\"margin: 5px 0;\"><strong>Numéro de devis :</strong> ").append(safe(request.getQuoteNumber())).append("</p>");
+        if (request.getTotalQuoted() != null) {
+            content.append("<p style=\"margin: 5px 0;\"><strong>Montant total :</strong> ")
+                    .append(formatCurrency(request.getTotalQuoted())).append(" FCFA</p>");
+        }
+        content.append("</div>");
+
+        // Informations du client
+        content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+        content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">👤 Informations du client</h3>");
+        String clientName = buildClientFullName(client);
+        content.append("<p style=\"margin: 5px 0;\"><strong>Nom :</strong> ").append(clientName).append("</p>");
+        content.append("<p style=\"margin: 5px 0;\"><strong>Email :</strong> ").append(safe(client.getEmail())).append("</p>");
+        if (client.getPhoneNumber() != null && !client.getPhoneNumber().isBlank()) {
+            content.append("<p style=\"margin: 5px 0;\"><strong>Téléphone :</strong> ").append(safe(client.getPhoneNumber())).append("</p>");
+        }
+        content.append("</div>");
+
+        // Adresse de livraison
+        String deliveryAddress = buildDeliveryAddress(request);
+        if (!deliveryAddress.isBlank()) {
+            content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📍 Adresse de livraison</h3>");
+            content.append("<p style=\"margin: 5px 0; white-space: pre-line;\">").append(deliveryAddress).append("</p>");
+            content.append("</div>");
+        }
+
+        // Articles à livrer
+        String itemsList = buildItemsList(request);
+        if (!itemsList.isBlank()) {
+            content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📦 Articles à livrer</h3>");
+            content.append(itemsList);
+            content.append("</div>");
+        }
+
+        // Instructions de livraison
+        if (request.getDeliveryDetails() != null && !request.getDeliveryDetails().isBlank()) {
+            content.append("<div style=\"background-color: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;\">");
+            content.append("<h3 style=\"margin-top: 0; color: #856404; font-size: 18px;\">⚠️ Instructions de livraison</h3>");
+            content.append("<p style=\"margin: 5px 0; white-space: pre-line; color: #856404;\">")
+                    .append(request.getDeliveryDetails().replace("\n", "<br>")).append("</p>");
+            content.append("</div>");
+        }
+
+        // Notes administratives (si pertinentes)
+        if (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()) {
+            content.append("<div style=\"background-color: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append("<h3 style=\"margin-top: 0; color: #004085; font-size: 18px;\">ℹ️ Notes internes</h3>");
+            content.append("<p style=\"margin: 5px 0; white-space: pre-line; color: #004085;\">")
+                    .append(request.getAdminNotes().replace("\n", "<br>")).append("</p>");
+            content.append("</div>");
+        }
+
+        content.append("<p style=\"font-size: 14px; color: #666666; margin-top: 20px;\">");
+        content.append("Merci de confirmer la réception de cette assignation et de procéder à la livraison dans les meilleurs délais.");
+        content.append("</p>");
+
+        return content.toString();
+    }
+
+    private String buildLivreurAssignmentTextContent(QuoteRequest request) {
+        User client = request.getUser();
+        StringBuilder text = new StringBuilder();
+
+        text.append("NOUVELLE LIVRAISON ASSIGNÉE\n\n");
+        text.append("Une nouvelle livraison vous a été assignée.\n\n");
+
+        text.append("INFORMATIONS DU DEVIS\n");
+        text.append("Numéro de devis: ").append(safe(request.getQuoteNumber())).append("\n");
+        if (request.getTotalQuoted() != null) {
+            text.append("Montant total: ").append(formatCurrency(request.getTotalQuoted())).append(" FCFA\n");
+        }
+        text.append("\n");
+
+        text.append("INFORMATIONS DU CLIENT\n");
+        text.append("Nom: ").append(buildClientFullName(client)).append("\n");
+        text.append("Email: ").append(safe(client.getEmail())).append("\n");
+        if (client.getPhoneNumber() != null && !client.getPhoneNumber().isBlank()) {
+            text.append("Téléphone: ").append(safe(client.getPhoneNumber())).append("\n");
+        }
+        text.append("\n");
+
+        String deliveryAddress = buildDeliveryAddress(request);
+        if (!deliveryAddress.isBlank()) {
+            text.append("ADRESSE DE LIVRAISON\n").append(deliveryAddress).append("\n\n");
+        }
+
+        String itemsList = buildItemsListText(request);
+        if (!itemsList.isBlank()) {
+            text.append("ARTICLES À LIVRER\n").append(itemsList).append("\n");
+        }
+
+        if (request.getDeliveryDetails() != null && !request.getDeliveryDetails().isBlank()) {
+            text.append("INSTRUCTIONS DE LIVRAISON\n").append(request.getDeliveryDetails()).append("\n\n");
+        }
+
+        text.append("Merci de confirmer la réception et de procéder à la livraison.\n");
+
+        return text.toString();
+    }
+
+    private String buildClientFullName(User client) {
+        String firstName = safe(client.getFirstName());
+        String lastName = safe(client.getLastName());
+        String fullName = (firstName + " " + lastName).trim();
+        return fullName.isEmpty() ? safe(client.getEmail()) : fullName;
+    }
+
+    private String buildDeliveryAddress(QuoteRequest request) {
+        User client = request.getUser();
+        if (client == null || client.getAddresses() == null || client.getAddresses().isEmpty()) {
+            return "";
+        }
+
+        Address defaultAddress = client.getAddresses().stream()
+                .filter(addr -> addr != null && addr.isDefault())
+                .findFirst()
+                .orElse(client.getAddresses().stream()
+                        .filter(addr -> addr != null)
+                        .findFirst()
+                        .orElse(null));
+
+        if (defaultAddress == null) {
+            return "";
+        }
+
+        StringBuilder address = new StringBuilder();
+        if (defaultAddress.getStreet() != null && !defaultAddress.getStreet().isBlank()) {
+            address.append(defaultAddress.getStreet());
+        }
+        if (defaultAddress.getCity() != null && !defaultAddress.getCity().isBlank()) {
+            appendAddressPart(address, defaultAddress.getCity());
+        }
+        if (defaultAddress.getRegion() != null && !defaultAddress.getRegion().isBlank()) {
+            appendAddressPart(address, defaultAddress.getRegion());
+        }
+        if (defaultAddress.getPostalCode() != null && !defaultAddress.getPostalCode().isBlank()) {
+            appendAddressPart(address, defaultAddress.getPostalCode());
+        }
+        if (defaultAddress.getCountry() != null) {
+            appendAddressPart(address, defaultAddress.getCountry().getDisplayName());
+        }
+        if (defaultAddress.getPhoneNumber() != null && !defaultAddress.getPhoneNumber().isBlank()) {
+            address.append("<br><strong>Téléphone de livraison :</strong> ").append(defaultAddress.getPhoneNumber());
+        }
+
+        return address.toString().trim();
+    }
+
+    private void appendAddressPart(StringBuilder builder, String part) {
+        if (part == null || part.isBlank()) {
+            return;
+        }
+        if (!builder.isEmpty()) {
+            builder.append(", ");
+        }
+        builder.append(part.trim());
+    }
+
+    private String buildItemsList(QuoteRequest request) {
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            return "";
+        }
+
+        StringBuilder items = new StringBuilder();
+        items.append("<table style=\"width: 100%; border-collapse: collapse; margin-top: 10px;\">");
+        items.append("<thead>");
+        items.append("<tr style=\"background-color: #e9ecef;\">");
+        items.append("<th style=\"padding: 10px; text-align: left; border: 1px solid #dee2e6;\">Produit</th>");
+        items.append("<th style=\"padding: 10px; text-align: center; border: 1px solid #dee2e6;\">Quantité</th>");
+        items.append("<th style=\"padding: 10px; text-align: right; border: 1px solid #dee2e6;\">Prix unitaire</th>");
+        items.append("</tr>");
+        items.append("</thead>");
+        items.append("<tbody>");
+
+        for (QuoteRequestItem item : request.getItems()) {
+            items.append("<tr>");
+            String productName = buildProductName(item);
+            items.append("<td style=\"padding: 10px; border: 1px solid #dee2e6;\">").append(productName).append("</td>");
+            items.append("<td style=\"padding: 10px; text-align: center; border: 1px solid #dee2e6;\">")
+                    .append(item.getQuantity()).append("</td>");
+            items.append("<td style=\"padding: 10px; text-align: right; border: 1px solid #dee2e6;\">")
+                    .append(formatCurrency(item.getUnitPrice())).append(" FCFA</td>");
+            items.append("</tr>");
+        }
+
+        items.append("</tbody>");
+        items.append("</table>");
+
+        return items.toString();
+    }
+
+    private String buildItemsListText(QuoteRequest request) {
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            return "";
+        }
+
+        StringBuilder items = new StringBuilder();
+        for (QuoteRequestItem item : request.getItems()) {
+            items.append("- ").append(buildProductName(item))
+                    .append(" (Quantité: ").append(item.getQuantity())
+                    .append(", Prix unitaire: ").append(formatCurrency(item.getUnitPrice()))
+                    .append(" FCFA)\n");
+        }
+        return items.toString();
+    }
+
+    private String buildProductName(QuoteRequestItem item) {
+        StringBuilder name = new StringBuilder();
+        if (item.getBrandName() != null && !item.getBrandName().isBlank()) {
+            name.append(item.getBrandName()).append(" ");
+        }
+        if (item.getProductName() != null && !item.getProductName().isBlank()) {
+            name.append(item.getProductName());
+        }
+        if (item.getWidthValue() != null || item.getProfileValue() != null || item.getDiameterValue() != null) {
+            name.append(" ");
+            if (item.getWidthValue() != null) {
+                name.append(item.getWidthValue());
+            }
+            if (item.getProfileValue() != null) {
+                name.append("/").append(item.getProfileValue());
+            }
+            if (item.getDiameterValue() != null) {
+                name.append(" R").append(item.getDiameterValue());
+            }
+        }
+        return name.toString().trim();
+    }
+
+    private String formatCurrency(BigDecimal amount) {
+        if (amount == null) {
+            return "0";
+        }
+        return String.format("%,.0f", amount.doubleValue()).replace(",", " ");
     }
 
     @Async

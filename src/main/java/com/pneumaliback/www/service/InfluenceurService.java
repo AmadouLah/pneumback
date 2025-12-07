@@ -77,13 +77,19 @@ public class InfluenceurService {
 
     @Transactional
     public InfluenceurResponse createInfluenceur(CreateInfluenceurRequest request) {
-        String normalizedEmail = normalizeEmail(request.email());
+        if (request.email() == null || request.email().trim().isEmpty()) {
+            throw new IllegalArgumentException("L'email est requis");
+        }
 
-        // Vérifier si l'email existe déjà
-        userRepository.findByEmailIgnoreCase(normalizedEmail)
-                .ifPresent(user -> {
-                    throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
-                });
+        String normalizedEmail = normalizeEmail(request.email());
+        if (normalizedEmail.isEmpty()) {
+            throw new IllegalArgumentException("L'email ne peut pas être vide");
+        }
+
+        if (isEmailAlreadyUsed(normalizedEmail, null)) {
+            log.warn("Tentative de création d'un influenceur avec un email existant: {}", normalizedEmail);
+            throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
+        }
 
         // Créer l'utilisateur
         User user = User.builder()
@@ -149,22 +155,23 @@ public class InfluenceurService {
         influenceur.setCommissionRate(request.commissionRate());
 
         boolean canEditEmail = canCurrentUserEditEmail();
-        if (request.email() != null) {
+        if (request.email() != null && !request.email().trim().isEmpty()) {
             String normalizedEmail = normalizeEmail(request.email());
             if (normalizedEmail.isEmpty()) {
                 throw new IllegalArgumentException("L'email ne peut pas être vide");
             }
 
-            if (!normalizedEmail.equalsIgnoreCase(user.getEmail())) {
+            String currentEmail = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : "";
+            if (!normalizedEmail.equals(currentEmail)) {
                 if (!canEditEmail) {
                     throw new IllegalArgumentException("Seul un développeur peut modifier l'email de l'influenceur");
                 }
 
-                userRepository.findByEmailIgnoreCase(normalizedEmail)
-                        .filter(existing -> !existing.getId().equals(user.getId()))
-                        .ifPresent(existing -> {
-                            throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
-                        });
+                if (isEmailAlreadyUsed(normalizedEmail, user.getId())) {
+                    log.warn("Tentative de modification de l'email de l'influenceur {} avec un email existant: {}",
+                            influenceurId, normalizedEmail);
+                    throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
+                }
                 user.setEmail(normalizedEmail);
             }
         }
@@ -259,7 +266,11 @@ public class InfluenceurService {
     }
 
     private String normalizeEmail(String email) {
-        return email != null ? email.trim().toLowerCase() : "";
+        if (email == null) {
+            return "";
+        }
+        String trimmed = email.trim();
+        return trimmed.isEmpty() ? "" : trimmed.toLowerCase();
     }
 
     private boolean canCurrentUserEditEmail() {
@@ -310,5 +321,21 @@ public class InfluenceurService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    /**
+     * Vérifie si un email est déjà utilisé par un autre utilisateur
+     * Utilise une requête SQL explicite avec LOWER() pour garantir la compatibilité PostgreSQL
+     * 
+     * @param email L'email à vérifier (doit être normalisé)
+     * @param excludeUserId L'ID de l'utilisateur à exclure de la vérification (null si création)
+     * @return true si l'email est déjà utilisé par un autre utilisateur
+     */
+    private boolean isEmailAlreadyUsed(String email, Long excludeUserId) {
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        // Utiliser la requête SQL explicite qui garantit la compatibilité avec PostgreSQL
+        return userRepository.existsByEmailIgnoreCaseExcludingUser(email, excludeUserId);
     }
 }

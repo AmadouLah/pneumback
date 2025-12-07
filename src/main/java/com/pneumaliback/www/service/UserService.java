@@ -75,11 +75,11 @@ public class UserService {
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()
                 && !request.getEmail().trim().equalsIgnoreCase(user.getEmail())) {
 
-            String newEmail = request.getEmail().trim().toLowerCase();
+            String newEmail = normalizeEmail(request.getEmail());
 
             // Vérifier que le nouvel email n'est pas déjà utilisé par un autre compte
-            if (userRepository.existsByEmail(newEmail)) {
-                throw new IllegalArgumentException("Cet email est déjà utilisé");
+            if (isEmailAlreadyUsed(newEmail, user.getId())) {
+                throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
             }
 
             // Sauvegarder l'ancien email avant de le changer
@@ -154,5 +154,32 @@ public class UserService {
         SecureRandom random = new SecureRandom();
         int code = random.nextInt(1_000_000);
         return String.format("%06d", code);
+    }
+
+    /**
+     * Normalise un email en supprimant les espaces et en convertissant en minuscules
+     */
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+        String trimmed = email.trim();
+        return trimmed.isEmpty() ? "" : trimmed.toLowerCase();
+    }
+
+    /**
+     * Vérifie si un email est déjà utilisé par un autre utilisateur
+     * Utilise une requête SQL explicite avec LOWER() pour garantir la compatibilité PostgreSQL
+     * 
+     * @param email L'email à vérifier (doit être normalisé)
+     * @param excludeUserId L'ID de l'utilisateur à exclure de la vérification (null si création)
+     * @return true si l'email est déjà utilisé par un autre utilisateur
+     */
+    private boolean isEmailAlreadyUsed(String email, Long excludeUserId) {
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        // Utiliser la requête SQL explicite qui garantit la compatibilité avec PostgreSQL
+        return userRepository.existsByEmailIgnoreCaseExcludingUser(email, excludeUserId);
     }
 }

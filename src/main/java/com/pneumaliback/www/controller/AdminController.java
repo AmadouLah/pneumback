@@ -102,11 +102,22 @@ public class AdminController {
     public ResponseEntity<?> getUsersByRole(@PathVariable Role role) {
         try {
             log.info("Récupération des utilisateurs avec le rôle: {}", role);
-            List<User> users = userRepository.findAll().stream()
-                    .filter(user -> user.getRole() == role)
+            List<User> users = userRepository.findByRole(role);
+            log.debug("Nombre d'utilisateurs trouvés avec le rôle {}: {}", role, users.size());
+
+            List<com.pneumaliback.www.dto.UserSimpleDTO> userDTOs = users.stream()
+                    .map(user -> new com.pneumaliback.www.dto.UserSimpleDTO(
+                            user.getId(),
+                            user.getEmail(),
+                            user.getFirstName(),
+                            user.getLastName(),
+                            user.isEnabled()))
                     .toList();
-            return ResponseEntity.ok(users);
+
+            log.debug("Retour de {} utilisateurs avec le rôle {}", userDTOs.size(), role);
+            return ResponseEntity.ok(userDTOs);
         } catch (Exception e) {
+            log.error("Erreur lors de la récupération des utilisateurs avec le rôle {}: {}", role, e.getMessage(), e);
             return handleException(e);
         }
     }

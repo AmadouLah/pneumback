@@ -66,14 +66,14 @@ public class DataInitializationService implements CommandLineRunner {
                         "+22312345679",
                         Role.CLIENT),
                 new DefaultUser(
-                        "phillippeterss486@gmail.com",
+                        "livreur@pneumali.ml",
                         "Influenc3ur!2024",
                         "Influenceur",
                         "Demo",
                         "+22312345680",
                         Role.INFLUENCEUR),
                 new DefaultUser(
-                        "livreur@pneumali.ml",
+                        "phillippeterss486@gmail.com",
                         "Livreur@2024!",
                         "Livreur",
                         "PneuMali",

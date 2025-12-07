@@ -22,6 +22,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
        boolean existsByEmailIgnoreCase(String email);
 
+       /**
+        * Vérifie si un email existe déjà (insensible à la casse) en excluant un utilisateur spécifique
+        * Utilise LOWER() pour garantir la compatibilité avec PostgreSQL
+        */
+       @Query("SELECT COUNT(u) > 0 FROM User u WHERE LOWER(u.email) = LOWER(:email) AND (:excludeUserId IS NULL OR u.id != :excludeUserId)")
+       boolean existsByEmailIgnoreCaseExcludingUser(@Param("email") String email, @Param("excludeUserId") Long excludeUserId);
+
        // === Recherche par rôle ===
        List<User> findByRole(Role role);
 
@@ -153,4 +160,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                      @Param("role") Role role,
                      @Param("startDate") Instant startDate,
                      @Param("endDate") Instant endDate);
+
+       @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.addresses WHERE u.email = :email")
+       Optional<User> findByEmailWithAddresses(@Param("email") String email);
 }

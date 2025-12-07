@@ -30,19 +30,19 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
     }
 
     /**
-     * Corrige la contrainte users_role_check pour inclure DEVELOPER
+     * Corrige la contrainte users_role_check pour inclure tous les rôles (ADMIN, CLIENT, INFLUENCEUR, DEVELOPER, LIVREUR)
      */
     private void fixRoleConstraint() {
         try {
             // Supprime l'ancienne contrainte si elle existe
             jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
 
-            // Crée la nouvelle contrainte avec tous les rôles
+            // Crée la nouvelle contrainte avec tous les rôles incluant LIVREUR
             jdbcTemplate.execute(
                     "ALTER TABLE users ADD CONSTRAINT users_role_check " +
-                            "CHECK (role IN ('ADMIN', 'CLIENT', 'INFLUENCEUR', 'DEVELOPER'))");
+                            "CHECK (role IN ('ADMIN', 'CLIENT', 'INFLUENCEUR', 'DEVELOPER', 'LIVREUR'))");
 
-            log.info("Contrainte users_role_check mise à jour avec succès");
+            log.info("Contrainte users_role_check mise à jour avec succès (inclut LIVREUR)");
         } catch (Exception e) {
             log.warn("Erreur lors de la mise à jour de la contrainte users_role_check: {}", e.getMessage());
             // Ne pas bloquer le démarrage si la contrainte est déjà correcte
