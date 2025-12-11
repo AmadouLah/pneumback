@@ -238,13 +238,31 @@ public class QuoteRequestService {
         }
         QuoteRequest request = loadDetailedQuote(requestId);
 
+        if (request.getAssignedLivreur() != null && Boolean.TRUE.equals(request.getLivreurAssignmentEmailSent())) {
+            throw new IllegalStateException("Ce devis est déjà assigné à un livreur et l'email a été envoyé avec succès. La réassignation n'est pas autorisée.");
+        }
+
+        boolean isReassignment = request.getAssignedLivreur() != null;
+        
         request.setAssignedLivreur(livreur);
         request.setDeliveryDetails(deliveryDetails != null ? deliveryDetails : request.getDeliveryDetails());
         request.setDeliveryAssignedAt(OffsetDateTime.now());
         request.setStatus(QuoteStatus.EN_COURS_LIVRAISON);
+        request.setLivreurAssignmentEmailSent(false);
 
         QuoteRequest saved = quoteRequestRepository.save(request);
-        mailService.notifyLivreurAssignment(livreur, saved);
+        
+        boolean emailSent = mailService.notifyLivreurAssignmentSync(livreur, saved);
+        if (emailSent) {
+            saved.setLivreurAssignmentEmailSent(true);
+            saved = quoteRequestRepository.save(saved);
+            log.info("Email d'assignation envoyé avec succès pour le devis {} au livreur {}", 
+                    saved.getQuoteNumber(), livreur.getEmail());
+        } else {
+            log.warn("Échec de l'envoi de l'email d'assignation pour le devis {} au livreur {}. La réassignation reste possible.", 
+                    saved.getQuoteNumber(), livreur.getEmail());
+        }
+        
         return saved;
     }
 
@@ -427,5 +445,69 @@ public class QuoteRequestService {
         } catch (Exception e) {
             log.debug("Impossible de charger les adresses de l'utilisateur: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Regénère tous les PDFs existants dans Supabase avec le nouveau format (sans le message du client).
+     * Cette méthode remplace les anciens PDFs par les nouveaux dans Supabase.
+     * 
+     * @return Nombre de PDFs regénérés avec succès
+     */
+    @Transactional
+    public int regenerateAllPdfs() {
+        List<QuoteRequest> quotesWithPdf = quoteRequestRepository.findAllWithPdfUrl();
+        if (quotesWithPdf.isEmpty()) {
+            log.info("Aucun PDF à regénérer");
+            return 0;
+        }
+
+        log.info("Début de la regénération de {} PDFs", quotesWithPdf.size());
+        User defaultEmitter = resolveCurrentAdmin();
+        if (defaultEmitter != null) {
+            loadUserAddresses(defaultEmitter);
+        }
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (QuoteRequest request : quotesWithPdf) {
+            try {
+                // Charger les données nécessaires
+                QuoteRequest detailedRequest = loadDetailedQuote(request.getId());
+                
+                User emitter = defaultEmitter;
+                if (emitter == null) {
+                    // Utiliser un admin par défaut si aucun admin n'est connecté
+                    emitter = userRepository.findByEmailIgnoreCase("contactlandoure@gmail.com")
+                            .orElse(null);
+                    if (emitter != null) {
+                        loadUserAddresses(emitter);
+                    }
+                }
+
+                // Regénérer le PDF avec le nouveau format
+                byte[] newPdf = quotePdfService.generateQuote(detailedRequest, emitter);
+                
+                // Remplacer l'ancien PDF dans Supabase
+                storeQuotePdf(detailedRequest, newPdf, null);
+                
+                // Sauvegarder la mise à jour
+                quoteRequestRepository.save(detailedRequest);
+                
+                successCount++;
+                log.debug("PDF regénéré avec succès pour le devis {}", detailedRequest.getQuoteNumber() != null 
+                        ? detailedRequest.getQuoteNumber() 
+                        : detailedRequest.getRequestNumber());
+            } catch (Exception e) {
+                errorCount++;
+                log.error("Erreur lors de la regénération du PDF pour le devis {}: {}", 
+                        request.getId(), e.getMessage(), e);
+            }
+        }
+
+        log.info("Regénération terminée: {} succès, {} erreurs sur {} PDFs", 
+                successCount, errorCount, quotesWithPdf.size());
+        
+        return successCount;
     }
 }

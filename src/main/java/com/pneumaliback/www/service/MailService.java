@@ -7,6 +7,7 @@ import com.pneumaliback.www.entity.QuoteRequest;
 import com.pneumaliback.www.entity.QuoteRequestItem;
 import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.enums.PromotionType;
+import com.pneumaliback.www.repository.UserRepository;
 import com.pneumaliback.www.service.mail.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 public class MailService {
 
     private final EmailSender emailSender;
+    private final UserRepository userRepository;
 
     private static final String DEFAULT_CONTACT_EMAIL = "amadoulandoure004@gmail.com";
 
@@ -41,6 +43,14 @@ public class MailService {
     @Value("${app.frontend-url:https://pneufront.vercel.app}")
     private String frontendUrl;
 
+    /**
+     * Envoie un code de vérification par email.
+     * IMPORTANT : Le code est envoyé UNIQUEMENT au destinataire spécifié, sans
+     * aucune copie (CC/BCC).
+     * 
+     * @param toEmail Adresse email du destinataire (unique)
+     * @param code    Code de vérification à envoyer
+     */
     @Async
     public void sendVerificationEmail(String toEmail, String code) {
         if (toEmail == null || toEmail.trim().isEmpty() || code == null || code.trim().isEmpty()) {
@@ -49,14 +59,17 @@ public class MailService {
         }
 
         String subject = "Votre code de connexion PneuMali";
+        User user = userRepository.findByEmailIgnoreCase(toEmail).orElse(null);
+        String greeting = buildGreeting(user);
+
         String content = "Vous avez demandé à vous connecter à votre compte PneuMali.<br><br>"
                 + "<strong style=\"font-size: 24px; color: #00d9ff; letter-spacing: 2px;\">" + code
                 + "</strong><br><br>"
                 + "Ce code est valide pendant 2 minutes.<br><br>"
                 + "Pour votre sécurité, ne partagez jamais ce code avec qui que ce soit.<br><br>"
                 + "<span style=\"color: #666666; font-size: 14px;\">Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.</span>";
-        String textBody = "Bonjour,\n\n"
-                + "Vous avez demandé à vous connecter à votre compte PneuMali.\n\n"
+
+        String textBody = "Vous avez demandé à vous connecter à votre compte PneuMali.\n\n"
                 + "Votre code de connexion est: " + code + "\n\n"
                 + "Ce code est valide pendant 2 minutes.\n\n"
                 + "Pour votre sécurité, ne partagez jamais ce code avec qui que ce soit.\n\n"
@@ -65,30 +78,60 @@ public class MailService {
                 + "L'équipe PneuMali\n"
                 + "Votre spécialiste pneus au Mali";
 
-        String htmlBody = buildEmailHtml("Bonjour,", content, null, null);
+        String htmlBody = buildEmailHtml(greeting, content, null, null);
+        // Envoi sécurisé : uniquement au destinataire, aucune copie
         sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "vérification");
     }
 
     private void sendEmailSafely(String to, String subject, String body, String type) {
-        sendHtmlEmailSafely(to, subject, buildEmailHtml("Bonjour,", body, null, null), body, type);
+        sendHtmlEmailSafely(to, subject, buildEmailHtml("", body, null, null), body, type);
     }
 
+    /**
+     * Envoie un email HTML de manière sécurisée.
+     * Garantit qu'aucune copie (CC/BCC) n'est envoyée - uniquement le destinataire
+     * spécifié.
+     * 
+     * @param to       Destinataire unique
+     * @param subject  Sujet de l'email
+     * @param htmlBody Corps HTML
+     * @param textBody Corps texte (fallback)
+     * @param type     Type d'email pour les logs
+     */
     private void sendHtmlEmailSafely(String to, String subject, String htmlBody, String textBody, String type) {
+        sendHtmlEmailSafelySync(to, subject, htmlBody, textBody, type);
+    }
+
+    /**
+     * Version synchrone de sendHtmlEmailSafely qui retourne le résultat de l'envoi.
+     * 
+     * @param to       Destinataire unique
+     * @param subject  Sujet de l'email
+     * @param htmlBody Corps HTML
+     * @param textBody Corps texte (fallback)
+     * @param type     Type d'email pour les logs
+     * @return true si l'email a été envoyé avec succès, false sinon
+     */
+    private boolean sendHtmlEmailSafelySync(String to, String subject, String htmlBody, String textBody, String type) {
         try {
-            log.info("📧 Préparation envoi email HTML {} via {} à {}", type, emailSender.getProviderName(), to);
+            log.info("📧 Préparation envoi email HTML {} via {} à {} (destinataire unique uniquement)",
+                    type, emailSender.getProviderName(), to);
             emailSender.sendHtmlEmail(to, subject, htmlBody, textBody);
-            log.info("✅ Email HTML {} CONFIRMÉ envoyé via {} à {}", type, emailSender.getProviderName(), to);
+            log.info("✅ Email HTML {} CONFIRMÉ envoyé via {} à {} (aucune copie)",
+                    type, emailSender.getProviderName(), to);
+            return true;
         } catch (Exception e) {
             log.error("❌ ÉCHEC envoi email HTML {} à {} via {}", type, to, emailSender.getProviderName());
             log.error("❌ Raison: {}", e.getMessage());
             log.error("❌ Stack trace:", e);
+            return false;
         }
     }
 
     /**
      * Construit un email HTML professionnel avec le style PneuMali
      * 
-     * @param greeting   Salutation (ex: "Bonjour," ou "Bonjour Amadou,")
+     * @param greeting   Salutation (non utilisée, conservée pour compatibilité)
      * @param content    Contenu principal de l'email (peut contenir du HTML)
      * @param buttonText Texte du bouton (optionnel, null si pas de bouton)
      * @param buttonLink URL du bouton (optionnel, requis si buttonText est fourni)
@@ -113,6 +156,10 @@ public class MailService {
         }
 
         String formattedContent = content.replace("\n", "<br>");
+        String greetingHtml = (greeting != null && !greeting.trim().isEmpty())
+                ? "<p style=\"margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;\">" + greeting
+                        + "</p>"
+                : "";
 
         return """
                 <!DOCTYPE html>
@@ -133,9 +180,8 @@ public class MailService {
                                     </tr>
                                     <tr>
                                         <td style="padding: 30px 40px;">
-                                            <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">"""
-                + greeting + """
-                        </p>
+                                            """
+                + greetingHtml + """
                         <div style="color: #333333; font-size: 16px; line-height: 1.6;">
                             """ + formattedContent + """
                         </div>
@@ -163,6 +209,14 @@ public class MailService {
                         """;
     }
 
+    /**
+     * Envoie un code de réinitialisation de mot de passe par email.
+     * IMPORTANT : Le code est envoyé UNIQUEMENT au destinataire spécifié, sans
+     * aucune copie (CC/BCC).
+     * 
+     * @param toEmail Adresse email du destinataire (unique)
+     * @param code    Code de réinitialisation à envoyer
+     */
     @Async
     public void sendPasswordResetEmail(String toEmail, String code) {
         if (toEmail == null || toEmail.trim().isEmpty() || code == null || code.trim().isEmpty()) {
@@ -176,14 +230,15 @@ public class MailService {
                 + "</strong><br><br>"
                 + "Ce code expire dans 15 minutes.<br><br>"
                 + "<span style=\"color: #666666; font-size: 14px;\">Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</span>";
-        String textBody = "Bonjour,\n\n"
-                + "Voici votre code de réinitialisation: " + code + "\n"
+        User user = userRepository.findByEmailIgnoreCase(toEmail).orElse(null);
+        String greeting = buildGreeting(user);
+        String textBody = "Voici votre code de réinitialisation: " + code + "\n"
                 + "Ce code expire dans 15 minutes.\n\n"
                 + "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.\n\n"
                 + "Cordialement,\n"
                 + "L'équipe PneuMali";
 
-        String htmlBody = buildEmailHtml("Bonjour,", content, null, null);
+        String htmlBody = buildEmailHtml(greeting, content, null, null);
         sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "réinitialisation");
     }
 
@@ -198,15 +253,16 @@ public class MailService {
                 + "<strong>IP:</strong> " + (ip != null ? ip : "Inconnue") + "<br>"
                 + "<strong>Navigateur/Appareil:</strong> " + (userAgent != null ? userAgent : "Inconnu") + "<br><br>"
                 + "<span style=\"color: #dc2626;\">Si ce n'était pas vous, veuillez sécuriser votre compte immédiatement.</span>";
-        String textBody = "Bonjour,\n\n"
-                + "Une tentative de connexion suspecte a été détectée sur votre compte.\n\n"
+        User user = userRepository.findByEmailIgnoreCase(toEmail).orElse(null);
+        String greeting = buildGreeting(user);
+        String textBody = "Une tentative de connexion suspecte a été détectée sur votre compte.\n\n"
                 + "IP: " + (ip != null ? ip : "Inconnue") + "\n"
                 + "Navigateur/Appareil: " + (userAgent != null ? userAgent : "Inconnu") + "\n\n"
                 + "Si ce n'était pas vous, veuillez sécuriser votre compte immédiatement.\n\n"
                 + "Cordialement,\n"
                 + "L'équipe PneuMali";
 
-        String htmlBody = buildEmailHtml("Bonjour,", content, null, null);
+        String htmlBody = buildEmailHtml(greeting, content, null, null);
         sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "alerte");
     }
 
@@ -238,15 +294,16 @@ public class MailService {
                 + "<strong>Ancienne adresse:</strong> " + oldEmail + "<br>"
                 + "<strong>Nouvelle adresse:</strong> " + newEmail + "<br><br>"
                 + "<span style=\"color: #dc2626;\">Si vous n'êtes pas à l'origine de ce changement, contactez-nous immédiatement.</span>";
-        String textBody = "Bonjour,\n\n"
-                + "L'adresse email associée à votre compte a été modifiée.\n\n"
+        User user = userRepository.findByEmailIgnoreCase(newEmail).orElse(null);
+        String greeting = buildGreeting(user);
+        String textBody = "L'adresse email associée à votre compte a été modifiée.\n\n"
                 + "Ancienne adresse: " + oldEmail + "\n"
                 + "Nouvelle adresse: " + newEmail + "\n\n"
                 + "Si vous n'êtes pas à l'origine de ce changement, contactez-nous immédiatement.\n\n"
                 + "Cordialement,\n"
                 + "L'équipe PneuMali";
 
-        String htmlBody = buildEmailHtml("Bonjour,", content, null, null);
+        String htmlBody = buildEmailHtml(greeting, content, null, null);
         sendHtmlEmailSafely(newEmail, subject, htmlBody, textBody, "changement email");
     }
 
@@ -263,7 +320,6 @@ public class MailService {
 
         String subject = "Nouvelle demande de contact - PneuMali";
         StringBuilder body = new StringBuilder()
-                .append("Bonjour,\n\n")
                 .append("Une nouvelle demande a été envoyée depuis le site PneuMali.\n\n")
                 .append("Nom: ").append(senderName != null ? senderName : "Inconnu").append("\n")
                 .append("Email: ").append(senderEmail != null ? senderEmail : "Non fourni").append("\n")
@@ -294,9 +350,7 @@ public class MailService {
             return;
         }
 
-        String firstName = influenceur.getUser().getFirstName();
-        String greeting = (firstName != null && !firstName.trim().isEmpty()) ? "Bonjour " + firstName + ","
-                : "Bonjour,";
+        String greeting = buildGreeting(influenceur.getUser());
         String subject = "PneuMali - Nouveau code promotionnel attribué";
 
         String reductionLabel = promotion.getType() == PromotionType.FIXED_AMOUNT
@@ -319,8 +373,7 @@ public class MailService {
                 .append("Merci de faire partie de la communauté PneuMali 🙌<br><br>")
                 .append("Support : ").append(supportEmail);
 
-        String textBody = (greeting + "\n\n"
-                + "Félicitations ! Un nouveau code promo vient de vous être attribué dans le cadre du programme d’affiliation PneuMali.\n\n"
+        String textBody = "Félicitations ! Un nouveau code promo vient de vous être attribué dans le cadre du programme d'affiliation PneuMali.\n\n"
                 + "Code promo : " + promotion.getCode() + "\n"
                 + reductionLabel + " : " + reductionValue + "\n"
                 + "Validité : " + validityValue + "\n\n"
@@ -328,7 +381,7 @@ public class MailService {
                 + "Chaque achat effectué avec votre code sera automatiquement relié à votre compte, et vos commissions seront calculées en conséquence.\n\n"
                 + "Suivez les performances de votre code depuis votre espace influenceur.\n\n"
                 + "Merci de faire partie de la communauté PneuMali 🙌\n"
-                + "Support : " + supportEmail);
+                + "Support : " + supportEmail;
 
         String htmlBody = buildEmailHtml(greeting, content.toString(), null, null);
         sendHtmlEmailSafely(toEmail, subject, htmlBody, textBody, "nouveau code promo influenceur");
@@ -342,7 +395,7 @@ public class MailService {
         }
 
         String subject = "Bienvenue sur PneuMali - Définissez votre mot de passe";
-        String greeting = firstName != null && !firstName.trim().isEmpty() ? "Bonjour " + firstName + "," : "Bonjour,";
+        String greeting = "";
         String baseUrl = normalizeFrontendUrl();
         String resetLink = baseUrl + "/auth/set-password?token=" + resetToken + "&email=" + toEmail;
 
@@ -350,8 +403,7 @@ public class MailService {
                 + "Votre compte a été créé avec succès. Pour commencer, vous devez définir votre mot de passe.<br><br>"
                 + "<span style=\"color: #666666; font-size: 14px;\">Ce lien est valide pendant 7 jours.</span><br><br>"
                 + "<span style=\"color: #666666; font-size: 14px;\">Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet email.</span>";
-        String textBody = greeting + "\n\n"
-                + "Bienvenue dans l'équipe PneuMali en tant qu'influenceur !\n\n"
+        String textBody = "Bienvenue dans l'équipe PneuMali en tant qu'influenceur !\n\n"
                 + "Votre compte a été créé avec succès. Pour commencer, vous devez définir votre mot de passe.\n\n"
                 + "Définir votre mot de passe : " + resetLink + "\n\n"
                 + "Ce lien est valide pendant 7 jours.\n\n"
@@ -431,8 +483,6 @@ public class MailService {
         }
         String subject = "Nouvelle demande de devis " + request.getRequestNumber();
         String body = """
-                Bonjour,
-
                 Une nouvelle demande de devis vient d'être soumise sur PneuMali.
 
                 Numéro : %s
@@ -510,8 +560,6 @@ public class MailService {
         }
         String subject = "Devis validé par le client - " + request.getQuoteNumber();
         String body = """
-                Bonjour,
-
                 Le devis %s vient d'être validé électroniquement par le client %s %s.
 
                 Montant : %s
@@ -540,19 +588,33 @@ public class MailService {
 
     @Async
     public void notifyLivreurAssignment(User livreur, QuoteRequest request) {
+        notifyLivreurAssignmentSync(livreur, request);
+    }
+
+    /**
+     * Version synchrone de notifyLivreurAssignment pour permettre la gestion des
+     * erreurs.
+     * Retourne true si l'email a été envoyé avec succès, false sinon.
+     * 
+     * @param livreur Livreur à qui envoyer l'email
+     * @param request Devis assigné
+     * @return true si l'email a été envoyé avec succès, false sinon
+     */
+    public boolean notifyLivreurAssignmentSync(User livreur, QuoteRequest request) {
         if (livreur == null || livreur.getEmail() == null || livreur.getEmail().isBlank()) {
-            return;
+            log.warn("Impossible d'envoyer l'email d'assignation: livreur ou email manquant");
+            return false;
         }
         if (request == null || request.getUser() == null) {
             log.warn("Impossible d'envoyer l'email d'assignation: devis ou client manquant");
-            return;
+            return false;
         }
 
         String subject = "Nouvelle livraison assignée - Devis " + safe(request.getQuoteNumber());
         String greeting = buildGreeting(livreur);
         String content = buildLivreurAssignmentContent(request);
 
-        sendHtmlEmailSafely(livreur.getEmail(), subject, buildEmailHtml(greeting, content, null, null),
+        return sendHtmlEmailSafelySync(livreur.getEmail(), subject, buildEmailHtml(greeting, content, null, null),
                 buildLivreurAssignmentTextContent(request), "assignation livreur");
     }
 
@@ -561,13 +623,16 @@ public class MailService {
         StringBuilder content = new StringBuilder();
 
         content.append("<p style=\"font-size: 16px; line-height: 1.6; color: #333333;\">");
-        content.append("Une nouvelle livraison vous a été assignée. Veuillez trouver ci-dessous tous les détails nécessaires pour effectuer la livraison.");
+        content.append(
+                "Une nouvelle livraison vous a été assignée. Veuillez trouver ci-dessous tous les détails nécessaires pour effectuer la livraison.");
         content.append("</p><br>");
 
         // Informations du devis
-        content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+        content.append(
+                "<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
         content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📋 Informations du devis</h3>");
-        content.append("<p style=\"margin: 5px 0;\"><strong>Numéro de devis :</strong> ").append(safe(request.getQuoteNumber())).append("</p>");
+        content.append("<p style=\"margin: 5px 0;\"><strong>Numéro de devis :</strong> ")
+                .append(safe(request.getQuoteNumber())).append("</p>");
         if (request.getTotalQuoted() != null) {
             content.append("<p style=\"margin: 5px 0;\"><strong>Montant total :</strong> ")
                     .append(formatCurrency(request.getTotalQuoted())).append(" FCFA</p>");
@@ -575,29 +640,36 @@ public class MailService {
         content.append("</div>");
 
         // Informations du client
-        content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+        content.append(
+                "<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
         content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">👤 Informations du client</h3>");
         String clientName = buildClientFullName(client);
         content.append("<p style=\"margin: 5px 0;\"><strong>Nom :</strong> ").append(clientName).append("</p>");
-        content.append("<p style=\"margin: 5px 0;\"><strong>Email :</strong> ").append(safe(client.getEmail())).append("</p>");
+        content.append("<p style=\"margin: 5px 0;\"><strong>Email :</strong> ").append(safe(client.getEmail()))
+                .append("</p>");
         if (client.getPhoneNumber() != null && !client.getPhoneNumber().isBlank()) {
-            content.append("<p style=\"margin: 5px 0;\"><strong>Téléphone :</strong> ").append(safe(client.getPhoneNumber())).append("</p>");
+            content.append("<p style=\"margin: 5px 0;\"><strong>Téléphone :</strong> ")
+                    .append(safe(client.getPhoneNumber())).append("</p>");
         }
         content.append("</div>");
 
         // Adresse de livraison
         String deliveryAddress = buildDeliveryAddress(request);
         if (!deliveryAddress.isBlank()) {
-            content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
-            content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📍 Adresse de livraison</h3>");
-            content.append("<p style=\"margin: 5px 0; white-space: pre-line;\">").append(deliveryAddress).append("</p>");
+            content.append(
+                    "<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append(
+                    "<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📍 Adresse de livraison</h3>");
+            content.append("<p style=\"margin: 5px 0; white-space: pre-line;\">").append(deliveryAddress)
+                    .append("</p>");
             content.append("</div>");
         }
 
         // Articles à livrer
         String itemsList = buildItemsList(request);
         if (!itemsList.isBlank()) {
-            content.append("<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append(
+                    "<div style=\"background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
             content.append("<h3 style=\"margin-top: 0; color: #00d9ff; font-size: 18px;\">📦 Articles à livrer</h3>");
             content.append(itemsList);
             content.append("</div>");
@@ -605,8 +677,10 @@ public class MailService {
 
         // Instructions de livraison
         if (request.getDeliveryDetails() != null && !request.getDeliveryDetails().isBlank()) {
-            content.append("<div style=\"background-color: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;\">");
-            content.append("<h3 style=\"margin-top: 0; color: #856404; font-size: 18px;\">⚠️ Instructions de livraison</h3>");
+            content.append(
+                    "<div style=\"background-color: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;\">");
+            content.append(
+                    "<h3 style=\"margin-top: 0; color: #856404; font-size: 18px;\">⚠️ Instructions de livraison</h3>");
             content.append("<p style=\"margin: 5px 0; white-space: pre-line; color: #856404;\">")
                     .append(request.getDeliveryDetails().replace("\n", "<br>")).append("</p>");
             content.append("</div>");
@@ -614,7 +688,8 @@ public class MailService {
 
         // Notes administratives (si pertinentes)
         if (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()) {
-            content.append("<div style=\"background-color: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
+            content.append(
+                    "<div style=\"background-color: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;\">");
             content.append("<h3 style=\"margin-top: 0; color: #004085; font-size: 18px;\">ℹ️ Notes internes</h3>");
             content.append("<p style=\"margin: 5px 0; white-space: pre-line; color: #004085;\">")
                     .append(request.getAdminNotes().replace("\n", "<br>")).append("</p>");
@@ -622,7 +697,8 @@ public class MailService {
         }
 
         content.append("<p style=\"font-size: 14px; color: #666666; margin-top: 20px;\">");
-        content.append("Merci de confirmer la réception de cette assignation et de procéder à la livraison dans les meilleurs délais.");
+        content.append(
+                "Merci de confirmer la réception de cette assignation et de procéder à la livraison dans les meilleurs délais.");
         content.append("</p>");
 
         return content.toString();
@@ -746,7 +822,8 @@ public class MailService {
         for (QuoteRequestItem item : request.getItems()) {
             items.append("<tr>");
             String productName = buildProductName(item);
-            items.append("<td style=\"padding: 10px; border: 1px solid #dee2e6;\">").append(productName).append("</td>");
+            items.append("<td style=\"padding: 10px; border: 1px solid #dee2e6;\">").append(productName)
+                    .append("</td>");
             items.append("<td style=\"padding: 10px; text-align: center; border: 1px solid #dee2e6;\">")
                     .append(item.getQuantity()).append("</td>");
             items.append("<td style=\"padding: 10px; text-align: right; border: 1px solid #dee2e6;\">")
@@ -821,15 +898,15 @@ public class MailService {
                 "confirmation livraison");
     }
 
+    /**
+     * Construit une salutation personnalisée pour l'utilisateur.
+     * Retourne une chaîne vide car les salutations ne sont plus utilisées.
+     * 
+     * @param user Utilisateur pour lequel construire la salutation
+     * @return Chaîne vide (salutations désactivées)
+     */
     private String buildGreeting(User user) {
-        if (user == null) {
-            return "Bonjour,";
-        }
-        String firstName = safe(user.getFirstName());
-        if (!firstName.isBlank()) {
-            return "Bonjour " + firstName + ",";
-        }
-        return "Bonjour,";
+        return "";
     }
 
     private String safe(String value) {

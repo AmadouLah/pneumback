@@ -81,6 +81,9 @@ public class QuoteRequest extends EntiteAuditable {
     @JoinColumn(name = "assigned_livreur_id")
     private User assignedLivreur;
 
+    @Column(name = "livreur_assignment_email_sent", nullable = false)
+    private Boolean livreurAssignmentEmailSent = false;
+
     @Column(name = "delivery_details", columnDefinition = "TEXT")
     private String deliveryDetails;
 

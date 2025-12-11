@@ -56,15 +56,19 @@ public class BrevoEmailSender implements EmailSender {
             emailPayload.put("subject", subject);
             emailPayload.put("htmlContent", htmlBody);
             emailPayload.put("textContent", textBody != null ? textBody : htmlBody.replaceAll("<[^>]+>", ""));
+            
+            // Sécurité : Aucune copie (CC/BCC) n'est envoyée pour garantir la confidentialité
+            // Les codes de vérification ne doivent être envoyés qu'au destinataire unique
+            // Ne pas ajouter de "cc" ou "bcc" dans le payload
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(emailPayload, headers);
 
-            log.info("📤 Envoi via Brevo: from={}, to={}", fromAddress, to);
+            log.info("📤 Envoi via Brevo: from={}, to={} (aucune copie)", fromAddress, to);
             @SuppressWarnings("rawtypes")
             ResponseEntity response = restTemplate.postForEntity(BREVO_API_URL, request, Map.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("✅ Email envoyé à {} via Brevo", to);
+                log.info("✅ Email envoyé à {} via Brevo (destinataire unique uniquement)", to);
             } else {
                 throw new Exception("Erreur Brevo: " + response.getStatusCode());
             }

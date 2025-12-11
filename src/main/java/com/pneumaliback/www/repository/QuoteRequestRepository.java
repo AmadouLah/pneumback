@@ -41,4 +41,13 @@ public interface QuoteRequestRepository extends JpaRepository<QuoteRequest, Long
             where qr.id = :id
             """)
     Optional<QuoteRequest> findDetailedById(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = { "items", "user", "assignedLivreur" })
+    @Query("""
+            select distinct qr
+            from QuoteRequest qr
+            where qr.quotePdfUrl is not null and qr.quotePdfUrl != ''
+            order by qr.createdAt desc
+            """)
+    List<QuoteRequest> findAllWithPdfUrl();
 }

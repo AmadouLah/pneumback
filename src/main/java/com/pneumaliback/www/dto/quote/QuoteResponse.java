@@ -28,6 +28,7 @@ public record QuoteResponse(
         String adminNotes,
         String deliveryDetails,
         String assignedLivreur,
+        Boolean livreurAssignmentEmailSent,
         LocalDateTime updatedAt,
         List<QuoteItemResponse> items) {
 
@@ -50,6 +51,7 @@ public record QuoteResponse(
                 request.getAdminNotes(),
                 request.getDeliveryDetails(),
                 request.getAssignedLivreur() != null ? request.getAssignedLivreur().getEmail() : null,
+                request.getLivreurAssignmentEmailSent(),
                 request.getUpdatedAt(),
                 request.getItems().stream()
                         .map(QuoteResponse::mapItem)

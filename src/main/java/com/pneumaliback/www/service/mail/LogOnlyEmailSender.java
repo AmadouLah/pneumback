@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
  * Implémentation pour développement sans service email configuré
  * Log simplement les codes dans la console au lieu d'envoyer des emails
  * Utile quand Brevo n'est pas encore configuré
+ * 
+ * IMPORTANT : Aucune copie n'est envoyée - uniquement le destinataire spécifié est loggé
  */
 @Slf4j
 public class LogOnlyEmailSender implements EmailSender {
@@ -14,7 +16,7 @@ public class LogOnlyEmailSender implements EmailSender {
     public void sendEmail(String to, String subject, String body) {
         log.warn("📧 MODE DÉVELOPPEMENT - Email non envoyé (pas de service email configuré)");
         log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        log.warn("📬 Destinataire: {}", to);
+        log.warn("📬 Destinataire unique: {} (aucune copie)", to);
         log.warn("📌 Sujet: {}", subject);
         log.warn("📄 Corps:");
         log.warn("{}", body);

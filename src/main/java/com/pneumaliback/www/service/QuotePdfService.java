@@ -524,27 +524,23 @@ public class QuotePdfService {
     private String buildNotes(QuoteRequest request) {
         StringBuilder notes = new StringBuilder();
 
-        boolean hasNotes = (request.getClientMessage() != null && !request.getClientMessage().isBlank())
-                || (request.getAdminNotes() != null && !request.getAdminNotes().isBlank())
+        boolean hasNotes = (request.getAdminNotes() != null && !request.getAdminNotes().isBlank())
                 || (request.getDeliveryDetails() != null && !request.getDeliveryDetails().isBlank());
 
         if (hasNotes) {
             notes.append("<div class='notes-section'>");
 
-            if (request.getClientMessage() != null && !request.getClientMessage().isBlank()) {
-                notes.append("<div class='notes-title'>Message du client:</div>");
-                notes.append("<div class='notes-content'>").append(escapeHtml(request.getClientMessage()))
-                        .append("</div>");
-            }
-
             if (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()) {
-                notes.append("<div class='notes-title' style='margin-top: 15px;'>Notes administratives:</div>");
+                notes.append("<div class='notes-title'>Notes administratives:</div>");
                 notes.append("<div class='notes-content'>").append(escapeHtml(request.getAdminNotes()))
                         .append("</div>");
             }
 
             if (request.getDeliveryDetails() != null && !request.getDeliveryDetails().isBlank()) {
-                notes.append("<div class='notes-title' style='margin-top: 15px;'>Détails de livraison:</div>");
+                String marginTop = request.getAdminNotes() != null && !request.getAdminNotes().isBlank() 
+                        ? " style='margin-top: 15px;'" 
+                        : "";
+                notes.append("<div class='notes-title'").append(marginTop).append(">Détails de livraison:</div>");
                 notes.append("<div class='notes-content'>").append(escapeHtml(request.getDeliveryDetails()))
                         .append("</div>");
             }

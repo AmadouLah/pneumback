@@ -176,6 +176,24 @@ public class AdminQuoteController {
         return ResponseEntity.ok(QuoteResponse.from(updated));
     }
 
+    @PostMapping("/regenerate-all-pdfs")
+    @Operation(summary = "Regénérer tous les PDFs existants avec le nouveau format", 
+               description = "Remplace tous les anciens PDFs dans Supabase par les nouveaux (sans le message du client)")
+    public ResponseEntity<java.util.Map<String, Object>> regenerateAllPdfs() {
+        try {
+            int regeneratedCount = quoteRequestService.regenerateAllPdfs();
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "message", "Migration des PDFs terminée",
+                    "regeneratedCount", regeneratedCount));
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of(
+                            "success", false,
+                            "message", "Erreur lors de la migration: " + e.getMessage()));
+        }
+    }
+
     private QuoteAdminUpdate toServiceUpdate(QuoteAdminUpdateRequest payload) {
         List<QuoteAdminItem> items = payload.items() != null
                 ? payload.items().stream()

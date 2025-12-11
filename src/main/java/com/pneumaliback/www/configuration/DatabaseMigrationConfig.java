@@ -26,6 +26,7 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
         fixPromotionsDiscountPercentage();
         ensurePromotionActiveColumn();
         ensureInfluenceurArchivedColumn();
+        ensureLivreurAssignmentEmailSentColumn();
         log.info("Migrations de base de données terminées.");
     }
 
@@ -122,6 +123,43 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
             jdbcTemplate.execute("ALTER TABLE influenceurs ALTER COLUMN archived SET DEFAULT FALSE");
         } catch (Exception e) {
             log.warn("Erreur lors de la vérification/ajout de la colonne archived dans influenceurs: {}",
+                    e.getMessage());
+        }
+    }
+
+    /**
+     * Ajoute la colonne livreur_assignment_email_sent à quote_requests si nécessaire.
+     * Pour les devis existants qui ont déjà un livreur assigné, on suppose que l'email a été envoyé avec succès.
+     */
+    private void ensureLivreurAssignmentEmailSentColumn() {
+        try {
+            Boolean exists = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS (" +
+                            "SELECT 1 FROM information_schema.columns " +
+                            "WHERE table_name = 'quote_requests' AND column_name = 'livreur_assignment_email_sent'" +
+                            ")",
+                    Boolean.class);
+
+            if (Boolean.FALSE.equals(exists)) {
+                jdbcTemplate.execute("ALTER TABLE quote_requests ADD COLUMN livreur_assignment_email_sent BOOLEAN");
+                log.info("Colonne livreur_assignment_email_sent ajoutée à quote_requests");
+            }
+
+            // Pour les devis existants qui ont déjà un livreur assigné mais livreur_assignment_email_sent = FALSE,
+            // on suppose que l'email a été envoyé avec succès (car ils ont été assignés avant cette fonctionnalité)
+            int updatedCount = jdbcTemplate.update(
+                    "UPDATE quote_requests SET livreur_assignment_email_sent = TRUE " +
+                            "WHERE assigned_livreur_id IS NOT NULL AND livreur_assignment_email_sent = FALSE");
+            if (updatedCount > 0) {
+                log.info("{} devis existants avec livreur assigné corrigés (email considéré comme envoyé)", updatedCount);
+            }
+
+            // Mettre à jour les valeurs NULL restantes (devis sans livreur assigné)
+            jdbcTemplate.execute("UPDATE quote_requests SET livreur_assignment_email_sent = FALSE WHERE livreur_assignment_email_sent IS NULL");
+            jdbcTemplate.execute("ALTER TABLE quote_requests ALTER COLUMN livreur_assignment_email_sent SET NOT NULL");
+            jdbcTemplate.execute("ALTER TABLE quote_requests ALTER COLUMN livreur_assignment_email_sent SET DEFAULT FALSE");
+        } catch (Exception e) {
+            log.warn("Erreur lors de la vérification/ajout de la colonne livreur_assignment_email_sent dans quote_requests: {}",
                     e.getMessage());
         }
     }
