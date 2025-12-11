@@ -27,6 +27,8 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
         ensurePromotionActiveColumn();
         ensureInfluenceurArchivedColumn();
         ensureLivreurAssignmentEmailSentColumn();
+        ensureQuoteRequestNewColumns();
+        fixQuoteRequestStatusConstraint();
         log.info("Migrations de base de données terminées.");
     }
 
@@ -161,6 +163,94 @@ public class DatabaseMigrationConfig implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Erreur lors de la vérification/ajout de la colonne livreur_assignment_email_sent dans quote_requests: {}",
                     e.getMessage());
+        }
+    }
+
+    /**
+     * Ajoute les nouvelles colonnes à quote_requests pour le système de livraison complet
+     */
+    private void ensureQuoteRequestNewColumns() {
+        ensureColumn("quote_requests", "validated_device_info", "VARCHAR(256)");
+        ensureColumn("quote_requests", "validated_pdf_url", "VARCHAR(512)");
+        ensureColumn("quote_requests", "requested_delivery_date", "DATE");
+        
+        // Pour client_absent_count, on l'ajoute d'abord nullable, puis on met les valeurs par défaut
+        try {
+            Boolean exists = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS (" +
+                            "SELECT 1 FROM information_schema.columns " +
+                            "WHERE table_name = 'quote_requests' AND column_name = 'client_absent_count'" +
+                            ")",
+                    Boolean.class);
+
+            if (Boolean.FALSE.equals(exists)) {
+                jdbcTemplate.execute("ALTER TABLE quote_requests ADD COLUMN client_absent_count INTEGER");
+                log.info("Colonne client_absent_count ajoutée à quote_requests");
+            }
+
+            // Mettre à jour les valeurs NULL et ajouter la contrainte
+            jdbcTemplate.execute("UPDATE quote_requests SET client_absent_count = 0 WHERE client_absent_count IS NULL");
+            jdbcTemplate.execute("ALTER TABLE quote_requests ALTER COLUMN client_absent_count SET NOT NULL");
+            jdbcTemplate.execute("ALTER TABLE quote_requests ALTER COLUMN client_absent_count SET DEFAULT 0");
+        } catch (Exception e) {
+            log.warn("Erreur lors de la vérification/ajout de la colonne client_absent_count dans quote_requests: {}",
+                    e.getMessage());
+        }
+    }
+
+    /**
+     * Corrige la contrainte quote_requests_status_check pour inclure tous les statuts valides
+     */
+    private void fixQuoteRequestStatusConstraint() {
+        try {
+            // Supprime l'ancienne contrainte si elle existe
+            jdbcTemplate.execute("ALTER TABLE quote_requests DROP CONSTRAINT IF EXISTS quote_requests_status_check");
+
+            // Crée la nouvelle contrainte avec tous les statuts valides
+            jdbcTemplate.execute(
+                    "ALTER TABLE quote_requests ADD CONSTRAINT quote_requests_status_check " +
+                            "CHECK (status IN (" +
+                            "'EN_ATTENTE', " +
+                            "'DEVIS_EN_PREPARATION', " +
+                            "'DEVIS_ENVOYE', " +
+                            "'EN_ATTENTE_VALIDATION', " +
+                            "'VALIDE_PAR_CLIENT', " +
+                            "'EN_COURS_LIVRAISON', " +
+                            "'LIVRE_EN_ATTENTE_CONFIRMATION', " +
+                            "'CLIENT_ABSENT', " +
+                            "'TERMINE', " +
+                            "'ANNULE'" +
+                            "))");
+
+            log.info("Contrainte quote_requests_status_check mise à jour avec succès (inclut tous les statuts)");
+        } catch (Exception e) {
+            log.warn("Erreur lors de la mise à jour de la contrainte quote_requests_status_check: {}", e.getMessage());
+            // Ne pas bloquer le démarrage si la contrainte est déjà correcte
+        }
+    }
+
+    /**
+     * Méthode utilitaire pour ajouter une colonne si elle n'existe pas
+     */
+    private void ensureColumn(String tableName, String columnName, String columnDefinition) {
+        try {
+            Boolean exists = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS (" +
+                            "SELECT 1 FROM information_schema.columns " +
+                            "WHERE table_name = ? AND column_name = ?" +
+                            ")",
+                    Boolean.class,
+                    tableName,
+                    columnName);
+
+            if (Boolean.FALSE.equals(exists)) {
+                String sql = String.format("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, columnDefinition);
+                jdbcTemplate.execute(sql);
+                log.info("Colonne {} ajoutée à {}", columnName, tableName);
+            }
+        } catch (Exception e) {
+            log.warn("Erreur lors de la vérification/ajout de la colonne {} dans {}: {}",
+                    columnName, tableName, e.getMessage());
         }
     }
 }

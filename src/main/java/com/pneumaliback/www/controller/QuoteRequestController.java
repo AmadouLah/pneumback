@@ -83,6 +83,7 @@ public class QuoteRequestController {
     public ResponseEntity<QuoteResponse> validateQuote(
             @AuthenticationPrincipal UserDetails principal,
             @PathVariable Long id,
+            @RequestBody(required = false) ValidateQuotePayload payload,
             HttpServletRequest httpRequest) {
         User user = resolveUser(principal);
         QuoteRequest request = quoteRequestService.getById(id);
@@ -93,7 +94,32 @@ public class QuoteRequestController {
         if (clientIp == null || clientIp.isBlank()) {
             clientIp = httpRequest.getRemoteAddr();
         }
-        QuoteRequest updated = quoteRequestService.validateByClient(request.getId(), clientIp);
+        String deviceInfo = payload != null ? payload.deviceInfo() : null;
+        if (deviceInfo == null || deviceInfo.isBlank()) {
+            deviceInfo = httpRequest.getHeader("User-Agent");
+        }
+        QuoteRequest updated = quoteRequestService.validateByClient(
+                request.getId(), 
+                clientIp, 
+                deviceInfo,
+                payload != null ? payload.requestedDeliveryDate() : null);
+        return ResponseEntity.ok(QuoteResponse.from(updated));
+    }
+
+    public record ValidateQuotePayload(java.time.LocalDate requestedDeliveryDate, String deviceInfo) {}
+
+    @PostMapping("/{id}/confirm-delivery")
+    @Operation(summary = "Confirmer la livraison par le client")
+    @ApiResponse(responseCode = "200", description = "Livraison confirmée", content = @Content(schema = @Schema(implementation = QuoteResponse.class)))
+    public ResponseEntity<QuoteResponse> confirmDelivery(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable Long id) {
+        User user = resolveUser(principal);
+        QuoteRequest request = quoteRequestService.getById(id);
+        if (!request.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Devis introuvable");
+        }
+        QuoteRequest updated = quoteRequestService.confirmDeliveryByClient(request.getId(), user);
         return ResponseEntity.ok(QuoteResponse.from(updated));
     }
 

@@ -888,14 +888,53 @@ public class MailService {
                 || request.getUser().getEmail().isBlank()) {
             return;
         }
-        String subject = "Confirmation de livraison - Devis " + request.getQuoteNumber();
+        String quoteNumber = request.getQuoteNumber() != null ? request.getQuoteNumber() : request.getRequestNumber();
+        String subject = "Livraison effectuée - Devis " + quoteNumber;
         String greeting = buildGreeting(request.getUser());
         String content = """
-                Votre commande a été marquée comme livrée. Merci de votre confiance !
+                <p>Votre commande a été marquée comme livrée par le livreur.</p>
+                <p>Merci de confirmer la réception en accédant à votre espace client.</p>
                 """;
-        sendHtmlEmailSafely(request.getUser().getEmail(), subject, buildEmailHtml(greeting, content, null, null),
-                content,
-                "confirmation livraison");
+        String linkText = "Confirmer la livraison";
+        String linkUrl = frontendUrl + "/mon-compte/devis";
+        sendHtmlEmailSafely(request.getUser().getEmail(), subject,
+                buildEmailHtml(greeting, content, linkText, linkUrl), content, "livraison effectuée");
+    }
+
+    @Async
+    public void notifyClientAbsent(QuoteRequest request) {
+        if (request.getUser() == null || request.getUser().getEmail() == null
+                || request.getUser().getEmail().isBlank()) {
+            return;
+        }
+        String quoteNumber = request.getQuoteNumber() != null ? request.getQuoteNumber() : request.getRequestNumber();
+        String subject = "Client absent - Devis " + quoteNumber;
+        String greeting = buildGreeting(request.getUser());
+        String content = """
+                <p>Le livreur s'est présenté à votre adresse mais n'a pas pu vous joindre.</p>
+                <p>Veuillez programmer une nouvelle date de livraison.</p>
+                """;
+        String linkText = "Gérer ma livraison";
+        String linkUrl = frontendUrl + "/mon-compte/devis";
+        sendHtmlEmailSafely(request.getUser().getEmail(), subject,
+                buildEmailHtml(greeting, content, linkText, linkUrl), content, "client absent");
+    }
+
+    @Async
+    public void notifyClientMultipleAbsences(QuoteRequest request) {
+        if (request.getUser() == null || request.getUser().getEmail() == null
+                || request.getUser().getEmail().isBlank()) {
+            return;
+        }
+        String quoteNumber = request.getQuoteNumber() != null ? request.getQuoteNumber() : request.getRequestNumber();
+        String subject = "Commande renvoyée au dépôt - Devis " + quoteNumber;
+        String greeting = buildGreeting(request.getUser());
+        String content = """
+                <p>Après deux tentatives de livraison infructueuses, votre commande a été renvoyée au dépôt.</p>
+                <p>Un administrateur vous contactera prochainement pour définir la suite : retrait sur place ou nouvelle tentative de livraison.</p>
+                """;
+        sendHtmlEmailSafely(request.getUser().getEmail(), subject,
+                buildEmailHtml(greeting, content, null, null), content, "renvoi au dépôt");
     }
 
     /**

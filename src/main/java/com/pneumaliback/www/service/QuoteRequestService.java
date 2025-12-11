@@ -48,6 +48,7 @@ public class QuoteRequestService {
     private final StorageService storageService;
     private final QuotePdfService quotePdfService;
     private final com.pneumaliback.www.repository.AddressRepository addressRepository;
+    private final com.pneumaliback.www.repository.DeliveryProofRepository deliveryProofRepository;
 
     private static final String QUOTE_STORAGE_FOLDER = "quotes";
 
@@ -214,7 +215,7 @@ public class QuoteRequestService {
     }
 
     @Transactional
-    public QuoteRequest validateByClient(Long requestId, String clientIp) {
+    public QuoteRequest validateByClient(Long requestId, String clientIp, String deviceInfo, LocalDate requestedDeliveryDate) {
         QuoteRequest request = loadDetailedQuote(requestId);
 
         if (request.getStatus() != QuoteStatus.EN_ATTENTE_VALIDATION
@@ -222,9 +223,39 @@ public class QuoteRequestService {
             throw new IllegalStateException("Ce devis ne peut pas être validé dans son état actuel.");
         }
 
+        // Sauvegarder le PDF figé lors de la validation
+        try {
+            User emitter = resolveCurrentAdmin();
+            if (emitter != null) {
+                loadUserAddresses(emitter);
+            }
+            byte[] pdf = quotePdfService.generateQuote(request, emitter);
+            String existingUrl = request.getQuotePdfUrl();
+            
+            // Sauvegarder une copie figée avec le suffixe "-validated"
+            String rawBaseName = request.getQuoteNumber() != null && !request.getQuoteNumber().isBlank()
+                    ? request.getQuoteNumber()
+                    : request.getRequestNumber();
+            String baseName = sanitizeFileName(rawBaseName);
+            String validatedFilename = baseName + "-validated.pdf";
+            
+            String validatedPdfUrl = storageService.uploadBytes(pdf, validatedFilename, QUOTE_STORAGE_FOLDER, "application/pdf");
+            request.setValidatedPdfUrl(validatedPdfUrl);
+            
+            // Restaurer l'URL originale si elle existait
+            if (existingUrl != null && !existingUrl.isBlank()) {
+                request.setQuotePdfUrl(existingUrl);
+            }
+        } catch (Exception e) {
+            log.error("Erreur lors de la sauvegarde du PDF validé pour le devis {}: {}", requestId, e.getMessage(), e);
+            // Ne pas bloquer la validation si le PDF ne peut pas être sauvegardé
+        }
+
         request.setStatus(QuoteStatus.VALIDE_PAR_CLIENT);
         request.setValidatedAt(OffsetDateTime.now());
         request.setValidatedIp(clientIp);
+        request.setValidatedDeviceInfo(deviceInfo);
+        request.setRequestedDeliveryDate(requestedDeliveryDate);
 
         QuoteRequest saved = quoteRequestRepository.save(request);
         mailService.notifyAdminsQuoteValidated(saved);
@@ -267,7 +298,8 @@ public class QuoteRequestService {
     }
 
     @Transactional
-    public QuoteRequest markDelivered(Long requestId, User livreur) {
+    public QuoteRequest markDelivered(Long requestId, User livreur, Double latitude, Double longitude, 
+            String photoBase64, String signatureData, String deliveryNotes) {
         QuoteRequest request = loadDetailedQuote(requestId);
 
         if (request.getAssignedLivreur() == null
@@ -275,12 +307,75 @@ public class QuoteRequestService {
             throw new IllegalStateException("Ce devis n'est pas assigné à ce livreur.");
         }
 
-        request.setStatus(QuoteStatus.TERMINE);
+        if (request.getStatus() != QuoteStatus.EN_COURS_LIVRAISON 
+                && request.getStatus() != QuoteStatus.CLIENT_ABSENT) {
+            throw new IllegalStateException("Ce devis ne peut pas être marqué comme livré dans son état actuel.");
+        }
+
+        // Créer la preuve de livraison avec toutes les informations
+        com.pneumaliback.www.entity.DeliveryProof proof = createDeliveryProof(request, livreur, latitude, longitude, photoBase64, signatureData, deliveryNotes);
+        deliveryProofRepository.save(proof);
+
+        // Mettre à jour le statut
+        request.setStatus(QuoteStatus.LIVRE_EN_ATTENTE_CONFIRMATION);
         request.setDeliveryConfirmedAt(OffsetDateTime.now());
 
         QuoteRequest saved = quoteRequestRepository.save(request);
         mailService.notifyQuoteDelivered(saved);
         return saved;
+    }
+
+    @Transactional
+    public QuoteRequest markClientAbsent(Long requestId, User livreur, String photoBase64, String notes) {
+        QuoteRequest request = loadDetailedQuote(requestId);
+
+        if (request.getAssignedLivreur() == null
+                || !request.getAssignedLivreur().getId().equals(livreur.getId())) {
+            throw new IllegalStateException("Ce devis n'est pas assigné à ce livreur.");
+        }
+
+        if (request.getStatus() != QuoteStatus.EN_COURS_LIVRAISON) {
+            throw new IllegalStateException("Ce devis ne peut pas être marqué comme client absent dans son état actuel.");
+        }
+
+        int absentCount = (request.getClientAbsentCount() != null ? request.getClientAbsentCount() : 0) + 1;
+        request.setClientAbsentCount(absentCount);
+
+        // Créer une preuve pour l'absence si photo ou notes fournies
+        if ((photoBase64 != null && !photoBase64.isBlank()) || (notes != null && !notes.isBlank())) {
+            String absentNotes = "Client absent" + (notes != null && !notes.isBlank() ? " - " + notes : "");
+            com.pneumaliback.www.entity.DeliveryProof proof = createDeliveryProof(request, livreur, null, null, photoBase64, null, absentNotes);
+            deliveryProofRepository.save(proof);
+        }
+
+        if (absentCount >= 2) {
+            // Après 2 absences, renvoyer au dépôt
+            request.setStatus(QuoteStatus.EN_ATTENTE);
+            request.setAssignedLivreur(null);
+            request.setLivreurAssignmentEmailSent(false);
+            mailService.notifyClientMultipleAbsences(request);
+        } else {
+            request.setStatus(QuoteStatus.CLIENT_ABSENT);
+            mailService.notifyClientAbsent(request);
+        }
+
+        return quoteRequestRepository.save(request);
+    }
+
+    @Transactional
+    public QuoteRequest confirmDeliveryByClient(Long requestId, User client) {
+        QuoteRequest request = loadDetailedQuote(requestId);
+
+        if (!request.getUser().getId().equals(client.getId())) {
+            throw new IllegalStateException("Ce devis ne vous appartient pas.");
+        }
+
+        if (request.getStatus() != QuoteStatus.LIVRE_EN_ATTENTE_CONFIRMATION) {
+            throw new IllegalStateException("Ce devis ne peut pas être confirmé dans son état actuel.");
+        }
+
+        request.setStatus(QuoteStatus.TERMINE);
+        return quoteRequestRepository.save(request);
     }
 
     private User resolveCurrentAdmin() {
@@ -401,6 +496,46 @@ public class QuoteRequestService {
             return "quote-" + System.currentTimeMillis();
         }
         return input.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    /**
+     * Crée une preuve de livraison avec upload de la photo dans Supabase si fournie
+     */
+    private com.pneumaliback.www.entity.DeliveryProof createDeliveryProof(
+            QuoteRequest request, User livreur, Double latitude, Double longitude,
+            String photoBase64, String signatureData, String notes) {
+        com.pneumaliback.www.entity.DeliveryProof proof = new com.pneumaliback.www.entity.DeliveryProof();
+        proof.setQuoteRequest(request);
+        proof.setLatitude(latitude);
+        proof.setLongitude(longitude);
+        proof.setSignatureData(signatureData);
+        proof.setDeliveryNotes(notes);
+        proof.setDeliveredByLivreur(livreur);
+
+        // Uploader la photo dans Supabase si fournie
+        if (photoBase64 != null && !photoBase64.isBlank()) {
+            try {
+                byte[] photoBytes = java.util.Base64.getDecoder().decode(
+                    photoBase64.replaceFirst("^data:image/[^;]*;base64,", ""));
+                String quoteIdentifier = request.getQuoteNumber() != null 
+                    ? request.getQuoteNumber() 
+                    : request.getRequestNumber();
+                String photoPrefix = latitude != null ? "delivery-" : "absent-";
+                String photoFilename = photoPrefix + quoteIdentifier + "-" + System.currentTimeMillis() + ".jpg";
+                String photoUrl = storageService.uploadBytes(photoBytes, photoFilename, "deliveries", "image/jpeg");
+                proof.setPhotoUrl(photoUrl);
+                log.info("Photo uploadée dans Supabase: {}", photoUrl);
+            } catch (Exception e) {
+                log.error("Erreur lors de l'upload de la photo dans Supabase: {}", e.getMessage(), e);
+                if (latitude != null) {
+                    // Pour les livraisons, la photo est obligatoire
+                    throw new IllegalStateException("Impossible de sauvegarder la photo de livraison dans Supabase", e);
+                }
+                // Pour les absences, on continue même si la photo échoue
+            }
+        }
+
+        return proof;
     }
 
     private QuoteRequest loadDetailedQuote(Long id) {

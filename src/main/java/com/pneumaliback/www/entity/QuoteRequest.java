@@ -71,6 +71,18 @@ public class QuoteRequest extends EntiteAuditable {
     @Column(name = "validated_ip", length = 64)
     private String validatedIp;
 
+    @Column(name = "validated_device_info", length = 256)
+    private String validatedDeviceInfo;
+
+    @Column(name = "validated_pdf_url")
+    private String validatedPdfUrl;
+
+    @Column(name = "requested_delivery_date")
+    private LocalDate requestedDeliveryDate;
+
+    @Column(name = "client_absent_count", nullable = false)
+    private Integer clientAbsentCount = 0;
+
     @Column(name = "delivery_assigned_at")
     private OffsetDateTime deliveryAssignedAt;
 

@@ -2,6 +2,8 @@ package com.pneumaliback.www.controller;
 
 import java.util.List;
 
+import com.pneumaliback.www.dto.quote.MarkClientAbsentPayload;
+import com.pneumaliback.www.dto.quote.MarkDeliveryPayload;
 import com.pneumaliback.www.dto.quote.QuoteResponse;
 import com.pneumaliback.www.entity.QuoteRequest;
 import com.pneumaliback.www.entity.User;
@@ -15,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -51,12 +55,26 @@ public class LivreurQuoteController {
     }
 
     @PostMapping("/{id}/complete")
-    @Operation(summary = "Confirmer la livraison d'un devis")
+    @Operation(summary = "Confirmer la livraison d'un devis avec preuves")
     public ResponseEntity<QuoteResponse> markDelivered(
             @AuthenticationPrincipal UserDetails principal,
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @Valid @RequestBody MarkDeliveryPayload payload) {
         User livreur = resolveLivreur(principal);
-        QuoteRequest updated = quoteRequestService.markDelivered(id, livreur);
+        QuoteRequest updated = quoteRequestService.markDelivered(
+                id, livreur, payload.latitude(), payload.longitude(),
+                payload.photoBase64(), payload.signatureData(), payload.deliveryNotes());
+        return ResponseEntity.ok(QuoteResponse.from(updated));
+    }
+
+    @PostMapping("/{id}/client-absent")
+    @Operation(summary = "Marquer un devis comme client absent")
+    public ResponseEntity<QuoteResponse> markClientAbsent(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable Long id,
+            @Valid @RequestBody MarkClientAbsentPayload payload) {
+        User livreur = resolveLivreur(principal);
+        QuoteRequest updated = quoteRequestService.markClientAbsent(id, livreur, payload.photoBase64(), payload.notes());
         return ResponseEntity.ok(QuoteResponse.from(updated));
     }
 
