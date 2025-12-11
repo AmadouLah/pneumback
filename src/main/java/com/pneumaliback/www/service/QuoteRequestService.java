@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.hibernate.Hibernate;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import com.pneumaliback.www.entity.QuoteRequest;
 import com.pneumaliback.www.entity.QuoteRequestItem;
 import com.pneumaliback.www.entity.User;
 import com.pneumaliback.www.enums.QuoteStatus;
+import com.pneumaliback.www.enums.Role;
 import com.pneumaliback.www.repository.ProductRepository;
 import com.pneumaliback.www.repository.QuoteRequestItemRepository;
 import com.pneumaliback.www.repository.QuoteRequestRepository;
@@ -150,6 +152,19 @@ public class QuoteRequestService {
     public QuoteRequest updateAdminQuote(Long requestId, QuoteAdminUpdate update) {
         QuoteRequest request = loadDetailedQuote(requestId);
 
+        // Validation : Si le devis est validé par le client ou dans un stade supérieur,
+        // personne ne peut plus modifier le devis (ni admin, ni développeur)
+        boolean isQuoteValidatedOrBeyond = request.getStatus() == QuoteStatus.VALIDE_PAR_CLIENT 
+                || request.getStatus() == QuoteStatus.EN_COURS_LIVRAISON
+                || request.getStatus() == QuoteStatus.LIVRE_EN_ATTENTE_CONFIRMATION
+                || request.getStatus() == QuoteStatus.CLIENT_ABSENT
+                || request.getStatus() == QuoteStatus.TERMINE;
+
+        if (isQuoteValidatedOrBeyond) {
+            throw new IllegalStateException(
+                    "Impossible de modifier ce devis : une fois validé par le client, aucune modification n'est autorisée.");
+        }
+
         if (update.validUntil() != null) {
             request.setValidUntil(update.validUntil());
         }
@@ -188,6 +203,22 @@ public class QuoteRequestService {
 
     @Transactional
     public QuoteRequest generateAndSendQuote(Long requestId, QuoteAdminUpdate update, String frontendQuoteUrl) {
+        // Vérifier le statut AVANT d'appliquer les mises à jour
+        QuoteRequest currentRequest = loadDetailedQuote(requestId);
+
+        // Vérifier si le devis a déjà été envoyé (statuts indiquant un envoi précédent)
+        if (currentRequest.getStatus() == QuoteStatus.DEVIS_ENVOYE 
+                || currentRequest.getStatus() == QuoteStatus.EN_ATTENTE_VALIDATION
+                || currentRequest.getStatus() == QuoteStatus.VALIDE_PAR_CLIENT
+                || currentRequest.getStatus() == QuoteStatus.EN_COURS_LIVRAISON
+                || currentRequest.getStatus() == QuoteStatus.LIVRE_EN_ATTENTE_CONFIRMATION
+                || currentRequest.getStatus() == QuoteStatus.CLIENT_ABSENT
+                || currentRequest.getStatus() == QuoteStatus.TERMINE) {
+            throw new IllegalStateException(
+                    "Ce devis a déjà été envoyé au client. Une fois envoyé, il ne peut plus être réenvié.");
+        }
+
+        // Appliquer les mises à jour
         QuoteRequest request = updateAdminQuote(requestId, update);
 
         if (request.getQuoteNumber() == null || request.getQuoteNumber().isBlank()) {
@@ -268,6 +299,15 @@ public class QuoteRequestService {
             throw new IllegalArgumentException("Livreur invalide");
         }
         QuoteRequest request = loadDetailedQuote(requestId);
+
+        // Validation : Le devis doit être validé par le client avant l'assignation d'un livreur
+        boolean isReassignmentAfterEmailFailure = request.getAssignedLivreur() != null 
+                && !Boolean.TRUE.equals(request.getLivreurAssignmentEmailSent())
+                && request.getStatus() == QuoteStatus.EN_COURS_LIVRAISON;
+        
+        if (!isReassignmentAfterEmailFailure && request.getStatus() != QuoteStatus.VALIDE_PAR_CLIENT) {
+            throw new IllegalStateException("Impossible d'assigner un livreur : le devis doit être validé par le client (statut VALIDE_PAR_CLIENT) avant l'assignation.");
+        }
 
         if (request.getAssignedLivreur() != null && Boolean.TRUE.equals(request.getLivreurAssignmentEmailSent())) {
             throw new IllegalStateException("Ce devis est déjà assigné à un livreur et l'email a été envoyé avec succès. La réassignation n'est pas autorisée.");
@@ -384,6 +424,19 @@ public class QuoteRequestService {
             return null;
         }
         return userRepository.findByEmailWithAddresses(authentication.getName()).orElse(null);
+    }
+
+    /**
+     * Vérifie si l'utilisateur actuellement authentifié est un développeur
+     */
+    private boolean isCurrentUserDeveloper() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> "ROLE_DEVELOPER".equals(authority));
     }
 
     public record QuoteAdminItem(Long productId, String productName, String brand, Integer width, Integer profile,
