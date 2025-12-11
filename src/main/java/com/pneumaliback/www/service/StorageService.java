@@ -25,7 +25,49 @@ public class StorageService {
     private String bucketName;
 
     @Value("${app.storage.supabase.service-role-key}")
+    private String serviceRoleKeyRaw;
+
     private String serviceRoleKey;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        // Nettoyer et valider la clé Supabase
+        if (serviceRoleKeyRaw == null || serviceRoleKeyRaw.trim().isBlank()) {
+            log.error("⚠️ SUPABASE_SERVICE_ROLE_KEY n'est pas définie ou est vide ! L'upload vers Supabase ne fonctionnera pas.");
+            log.error("⚠️ Veuillez définir la variable d'environnement SUPABASE_SERVICE_ROLE_KEY dans Render avec la clé 'service_role' de votre projet Supabase.");
+            serviceRoleKey = null;
+        } else {
+            // Nettoyer la clé (supprimer les espaces et retours à la ligne)
+            String cleanedKey = serviceRoleKeyRaw.trim().replaceAll("\\s+", "");
+            
+            // Validation basique : un JWT doit contenir au moins deux points
+            if (!cleanedKey.contains(".") || cleanedKey.split("\\.").length < 3) {
+                log.error("⚠️ SUPABASE_SERVICE_ROLE_KEY semble invalide (format JWT attendu avec 3 parties séparées par des points)");
+                log.error("⚠️ La clé doit être la 'service_role key' (pas l'anon key) de votre projet Supabase.");
+                serviceRoleKey = null;
+            } else {
+                serviceRoleKey = cleanedKey;
+                // Logger les 10 premiers caractères pour le debug (sans exposer la clé complète)
+                String keyPreview = serviceRoleKey.length() > 10 
+                    ? serviceRoleKey.substring(0, 10) + "..." 
+                    : "***";
+                log.info("✅ Clé Supabase configurée (preview: {}, longueur: {} caractères)", keyPreview, serviceRoleKey.length());
+            }
+        }
+        
+        // Valider également les autres paramètres
+        if (supabaseUrl == null || supabaseUrl.trim().isBlank()) {
+            log.warn("⚠️ SUPABASE_URL n'est pas définie");
+        } else {
+            log.info("✅ URL Supabase configurée: {}", supabaseUrl);
+        }
+        
+        if (bucketName == null || bucketName.trim().isBlank()) {
+            log.warn("⚠️ SUPABASE_BUCKET n'est pas défini");
+        } else {
+            log.info("✅ Bucket Supabase configuré: {}", bucketName);
+        }
+    }
 
     /**
      * Upload un fichier vers Supabase Storage
@@ -51,6 +93,8 @@ public class StorageService {
     }
 
     public String uploadBytes(byte[] data, String fileName, String folder, String contentType) {
+        validateSupabaseConfiguration();
+        
         if (data == null || data.length == 0) {
             throw new IllegalArgumentException("Le fichier est vide");
         }
@@ -77,6 +121,7 @@ public class StorageService {
         HttpEntity<byte[]> requestEntity = new HttpEntity<>(data, headers);
 
         try {
+            log.debug("Tentative d'upload vers Supabase: bucket={}, filePath={}", bucketName, filePath);
             ResponseEntity<String> response = restTemplate.exchange(
                     uploadUrl,
                     HttpMethod.POST,
@@ -89,12 +134,42 @@ public class StorageService {
                 log.info("Fichier uploadé avec succès: {}", publicUrl);
                 return publicUrl;
             } else {
-                log.error("Échec de l'upload: {}", response.getStatusCode());
-                throw new RuntimeException("Échec de l'upload vers Supabase: " + response.getStatusCode());
+                String errorBody = response.getBody() != null ? response.getBody() : "aucun détail";
+                log.error("Échec de l'upload vers Supabase: status={}, body={}", response.getStatusCode(), errorBody);
+                throw new RuntimeException("Échec de l'upload vers Supabase: " + response.getStatusCode() + " - " + errorBody);
             }
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String errorDetails = e.getResponseBodyAsString();
+            log.error("Erreur HTTP lors de l'upload vers Supabase: status={}, message={}, body={}", 
+                    e.getStatusCode(), e.getMessage(), errorDetails);
+            
+            if (e.getStatusCode().value() == 403 || e.getStatusCode().value() == 401) {
+                throw new RuntimeException(
+                        "Erreur d'authentification Supabase: vérifiez que SUPABASE_SERVICE_ROLE_KEY est correctement configurée dans les variables d'environnement (Render). " +
+                        "Message: " + (errorDetails != null ? errorDetails : e.getMessage()), e);
+            }
+            throw new RuntimeException("Erreur lors de l'upload vers Supabase: " + e.getStatusCode() + " - " + errorDetails, e);
         } catch (Exception e) {
-            log.error("Erreur lors de l'upload vers Supabase", e);
+            log.error("Erreur lors de l'upload vers Supabase: url={}, bucket={}", uploadUrl, bucketName, e);
             throw new RuntimeException("Erreur lors de l'upload vers Supabase: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateSupabaseConfiguration() {
+        if (serviceRoleKey == null || serviceRoleKey.isBlank()) {
+            throw new IllegalStateException(
+                    "Configuration Supabase invalide: SUPABASE_SERVICE_ROLE_KEY n'est pas définie ou est vide. " +
+                    "Vérifiez les variables d'environnement dans Render.");
+        }
+        if (supabaseUrl == null || supabaseUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "Configuration Supabase invalide: SUPABASE_URL n'est pas définie. " +
+                    "Vérifiez les variables d'environnement dans Render.");
+        }
+        if (bucketName == null || bucketName.isBlank()) {
+            throw new IllegalStateException(
+                    "Configuration Supabase invalide: SUPABASE_BUCKET n'est pas défini. " +
+                    "Vérifiez les variables d'environnement dans Render.");
         }
     }
 
@@ -105,6 +180,11 @@ public class StorageService {
      */
     public void deleteFile(String filePath) {
         if (filePath == null || filePath.isBlank()) {
+            return;
+        }
+
+        if (serviceRoleKey == null || serviceRoleKey.isBlank()) {
+            log.warn("Impossible de supprimer le fichier {}: clé Supabase non configurée", filePath);
             return;
         }
 
