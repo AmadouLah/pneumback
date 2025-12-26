@@ -9,7 +9,6 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
 
     private int min;
 
-    // Liste courte de mots de passe trop courants (peut être enrichie)
     private static final Set<String> COMMON_PASSWORDS = Set.of(
             "12345678", "password", "motdepasse", "11111111", "00000000",
             "123456789", "1234567", "qwerty", "azerty", "letmein");
@@ -28,12 +27,9 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
         if (pwd.length() < min)
             return false;
 
-        // Rejeter si uniquement chiffres
         if (pwd.matches("^[0-9]+$"))
             return false;
 
-        // Doit contenir au moins 3 des 4 catégories: minuscule, majuscule, chiffre,
-        // spécial
         boolean hasLower = pwd.matches(".*[a-z].*");
         boolean hasUpper = pwd.matches(".*[A-Z].*");
         boolean hasDigit = pwd.matches(".*[0-9].*");
@@ -42,11 +38,9 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
         if (buckets < 3)
             return false;
 
-        // Éviter suites simples (ex: 12345678, abcdefgh) et répétitions
         if (isSequential(pwd) || isRepeated(pwd))
             return false;
 
-        // Éviter mots de passe trop courants
         if (COMMON_PASSWORDS.contains(pwd.toLowerCase()))
             return false;
 
@@ -54,7 +48,6 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
     }
 
     private boolean isSequential(String s) {
-        // détecte suites croissantes de 6+ caractères (alpha ou numériques)
         if (s.length() < 6)
             return false;
         int incRun = 1;
@@ -71,7 +64,6 @@ public class StrongPasswordValidator implements ConstraintValidator<StrongPasswo
     }
 
     private boolean isRepeated(String s) {
-        // rejette si plus de 70% d'un même caractère
         int[] counts = new int[256];
         for (char c : s.toCharArray()) {
             if (c < 256)
