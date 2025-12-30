@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * Service unifié pour l'envoi d'emails
@@ -946,6 +949,62 @@ public class MailService {
      */
     private String buildGreeting(User user) {
         return "";
+    }
+
+    /**
+     * Envoie un email à tous les utilisateurs de l'application, sauf l'expéditeur.
+     * 
+     * @param senderEmail Email de l'expéditeur (sera exclu de la liste des
+     *                    destinataires)
+     * @param subject     Sujet de l'email
+     * @param message     Message à envoyer (peut contenir du HTML)
+     */
+    @Async
+    public void sendBroadcastEmail(String senderEmail, String subject, String message) {
+        if (senderEmail == null || senderEmail.trim().isEmpty() || subject == null || subject.trim().isEmpty()
+                || message == null || message.trim().isEmpty()) {
+            log.warn("Paramètres email de diffusion invalides");
+            return;
+        }
+
+        List<User> allUsers = userRepository.findAll();
+        String normalizedSenderEmail = senderEmail.trim().toLowerCase();
+
+        Set<String> processedEmails = new HashSet<>();
+        List<User> recipients = allUsers.stream()
+                .filter(user -> user.getEmail() != null && !user.getEmail().trim().isEmpty())
+                .filter(user -> {
+                    String email = user.getEmail().trim().toLowerCase();
+                    return !email.equals(normalizedSenderEmail) && user.isEnabled() && processedEmails.add(email);
+                })
+                .toList();
+
+        if (recipients.isEmpty()) {
+            log.warn("Aucun destinataire trouvé pour l'email de diffusion");
+            return;
+        }
+
+        log.info("📧 Envoi d'email de diffusion à {} adresses email uniques (expéditeur exclu: {})",
+                processedEmails.size(), senderEmail);
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (User recipient : recipients) {
+            String recipientEmail = recipient.getEmail().trim();
+            String greeting = buildGreeting(recipient);
+            String htmlBody = buildEmailHtml(greeting, message.replace("\n", "<br>"), null, null);
+            String textBody = message;
+
+            boolean success = sendHtmlEmailSafelySync(recipientEmail, subject, htmlBody, textBody, "diffusion");
+            if (success) {
+                successCount++;
+            } else {
+                failureCount++;
+            }
+        }
+
+        log.info("✅ Email de diffusion terminé: {} envoyés avec succès, {} échecs", successCount, failureCount);
     }
 
     private String safe(String value) {

@@ -12,6 +12,10 @@ import com.pneumaliback.www.repository.OrderRepository;
 import com.pneumaliback.www.repository.CommissionRepository;
 import com.pneumaliback.www.service.OrderService;
 import com.pneumaliback.www.service.CommissionService;
+import com.pneumaliback.www.service.MailService;
+import com.pneumaliback.www.dto.BroadcastEmailRequest;
+import jakarta.validation.Valid;
+import org.springframework.security.core.context.SecurityContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,6 +49,7 @@ public class AdminController {
     private final CommissionRepository commissionRepository;
     private final OrderService orderService;
     private final CommissionService commissionService;
+    private final MailService mailService;
 
     private ResponseEntity<?> handleException(Exception e) {
         if (e instanceof IllegalArgumentException) {
@@ -425,5 +430,32 @@ public class AdminController {
     }
 
     public record BalanceDTO(BigDecimal total, BigDecimal paid, BigDecimal pending) {
+    }
+
+    @PostMapping("/broadcast-email")
+    @Operation(summary = "Envoyer un email à tous les utilisateurs", description = "Envoie un email à tous les utilisateurs de l'application, sauf l'expéditeur")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Email envoyé avec succès"),
+            @ApiResponse(responseCode = "400", description = "Requête invalide", content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> sendBroadcastEmail(@Valid @RequestBody BroadcastEmailRequest request) {
+        try {
+            org.springframework.security.core.Authentication authentication = SecurityContextHolder.getContext()
+                    .getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(401).body(Map.of("error", "Utilisateur non authentifié"));
+            }
+
+            String senderEmail = authentication.getName();
+            log.info("Envoi d'email de diffusion par {} à tous les utilisateurs", senderEmail);
+
+            mailService.sendBroadcastEmail(senderEmail, request.subject(), request.message());
+
+            return ResponseEntity.ok(Map.of("message", "Email envoyé avec succès à tous les utilisateurs"));
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'email de diffusion", e);
+            return handleException(e);
+        }
     }
 }
