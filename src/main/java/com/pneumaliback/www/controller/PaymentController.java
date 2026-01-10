@@ -37,6 +37,7 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final CheckoutService checkoutService;
     private final OrderService orderService;
+    private final CartService cartService;
     private final PaydunyaProperties paydunyaProperties;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
@@ -59,6 +60,12 @@ public class PaymentController {
             
             Address address = addressRepository.findById(request.getAddressId())
                     .orElseThrow(() -> new IllegalArgumentException("Adresse introuvable"));
+
+            // Synchroniser le panier avec les items fournis
+            if (request.getCartItems() == null || request.getCartItems().isEmpty()) {
+                throw new IllegalArgumentException("Le panier ne peut pas être vide");
+            }
+            cartService.syncCartItems(user, request.getCartItems());
 
             // Créer la commande
             Order order = checkoutService.createOrder(user, address, request.getZone(), request.getPromoCode());

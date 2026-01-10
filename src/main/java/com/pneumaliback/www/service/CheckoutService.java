@@ -1,9 +1,9 @@
 package com.pneumaliback.www.service;
 
 import com.pneumaliback.www.entity.*;
+import com.pneumaliback.www.enums.DeliveryStatus;
 import com.pneumaliback.www.enums.OrderStatus;
 import com.pneumaliback.www.repository.CartRepository;
-import com.pneumaliback.www.repository.OrderItemRepository;
 import com.pneumaliback.www.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,6 @@ public class CheckoutService {
 
     private final CartRepository cartRepository;
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final PromotionService promotionService;
     private final DeliveryService deliveryService;
     private final OrderService orderService;
@@ -37,7 +36,6 @@ public class CheckoutService {
         order.setUser(user);
         order.setStatus(OrderStatus.PENDING);
         order.setOrderNumber(numberSequenceService.nextFormatted("ORDER", "CMD"));
-        orderRepository.save(order);
 
         // Lignes de commande depuis le panier
         for (CartItem ci : cart.getItems()) {
@@ -46,7 +44,6 @@ public class CheckoutService {
             oi.setProduct(ci.getProduct());
             oi.setQuantity(ci.getQuantity());
             oi.setUnitPrice(ci.getProduct().getPrice());
-            orderItemRepository.save(oi);
             order.getItems().add(oi);
         }
 
@@ -61,13 +58,21 @@ public class CheckoutService {
             }
         }
 
-        // Livraison (zone + frais)
+        // Livraison (zone + frais) - créée directement pour être persistée en cascade
         BigDecimal fee = deliveryService.quoteShippingFee(zone);
-        Delivery delivery = deliveryService.attachDelivery(order, shippingAddress, zone, fee);
+        Delivery delivery = new Delivery();
+        delivery.setOrder(order);
+        delivery.setAddress(shippingAddress);
+        delivery.setZone(zone);
+        delivery.setShippingFee(fee);
+        delivery.setStatus(DeliveryStatus.PENDING);
         order.setDelivery(delivery);
 
         // Totaux
         orderService.computeTotals(order);
+
+        // Sauvegarder l'Order une seule fois (les OrderItem et Delivery seront
+        // persistés en cascade)
         orderRepository.save(order);
 
         // Nettoyer le panier
