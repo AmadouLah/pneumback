@@ -8,7 +8,9 @@ import com.pneumaliback.www.repository.PaymentRepository;
 import com.pneumaliback.www.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,8 +30,7 @@ public class PaymentService {
             PaymentMethod.MOOV_MONEY,
             PaymentMethod.BANK_CARD,
             PaymentMethod.PAYPAL,
-            PaymentMethod.CASH_ON_DELIVERY
-    );
+            PaymentMethod.CASH_ON_DELIVERY);
 
     public List<PaymentMethod> getOrderedPaymentMethods() {
         // In case enum gains new values later, append unknowns at the end
@@ -50,8 +51,32 @@ public class PaymentService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public Payment createPayment(Order order, PaymentMethod method, BigDecimal amount, String invoiceToken) {
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setMethod(method);
+        payment.setStatus(PaymentStatus.PENDING);
+        payment.setAmount(amount);
+        payment.setProvider("Paydunya");
+        payment.setInvoiceToken(invoiceToken);
+        return paymentRepository.save(payment);
+    }
+
+    @Transactional
+    public Payment updatePaymentStatus(Long paymentId, PaymentStatus status, String transactionReference) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Paiement introuvable"));
+        payment.setStatus(status);
+        if (transactionReference != null && !transactionReference.isBlank()) {
+            payment.setTransactionReference(transactionReference);
+        }
+        return paymentRepository.save(payment);
+    }
+
     public void confirmSuccessByTransaction(String transactionReference) {
-        if (transactionReference == null || transactionReference.isBlank()) return;
+        if (transactionReference == null || transactionReference.isBlank())
+            return;
         paymentRepository.findByTransactionReference(transactionReference).ifPresent(payment -> {
             payment.setStatus(PaymentStatus.SUCCESS);
             Payment savedPayment = paymentRepository.save(payment);

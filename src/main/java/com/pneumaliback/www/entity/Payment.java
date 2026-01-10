@@ -40,6 +40,9 @@ public class Payment extends EntiteAuditable {
     @Column(length = 100, unique = true)
     private String transactionReference;
 
+    @Column(length = 100)
+    private String invoiceToken;
+
     @OneToOne
     private Order order;
 }

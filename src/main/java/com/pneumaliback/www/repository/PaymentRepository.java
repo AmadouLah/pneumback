@@ -60,4 +60,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     @Query("SELECT p FROM Payment p WHERE p.status = 'FAILED' AND p.createdAt >= :startDate")
     List<Payment> findRecentFailedPayments(@Param("startDate") LocalDateTime startDate);
+    
+    Optional<Payment> findByInvoiceToken(String invoiceToken);
 }
