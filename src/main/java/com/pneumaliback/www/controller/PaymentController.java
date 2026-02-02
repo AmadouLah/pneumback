@@ -44,8 +44,24 @@ public class PaymentController {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
 
+    /**
+     * Crée une facture PayDunya et retourne le token + URL de checkout.
+     * 
+     * 🔁 FLUX STANDARD PAYDUNYA :
+     * 1. Backend crée la facture → PayDunya retourne token + checkoutUrl
+     * 2. Frontend redirige l'utilisateur vers checkoutUrl (page PayDunya hébergée
+     * par eux)
+     * 3. Utilisateur choisit sa méthode de paiement sur la page PayDunya
+     * 4. PayDunya gère le paiement et fait un callback IPN vers
+     * /api/payments/callback/paydunya
+     * 5. Backend confirme automatiquement le paiement et la commande via le
+     * callback
+     */
     @PostMapping("/create")
-    @Operation(summary = "Créer une commande avec facture Paydunya", description = "Crée une commande à partir du panier et génère une facture Paydunya pour le paiement en ligne")
+    @Operation(summary = "Créer une commande avec facture Paydunya", description = "Crée une commande à partir du panier et génère une facture Paydunya. "
+            +
+            "Retourne un token et une URL de checkout. Redirigez l'utilisateur vers checkoutUrl " +
+            "pour qu'il choisisse sa méthode de paiement sur la page PayDunya.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Commande et facture créées avec succès", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaymentResponse.class))),
             @ApiResponse(responseCode = "400", description = "Paramètres invalides", content = @Content(mediaType = "application/json")),
@@ -54,10 +70,10 @@ public class PaymentController {
     })
     @Transactional
     public ResponseEntity<?> createPayment(@AuthenticationPrincipal UserDetails userDetails,
-                                          @Valid @RequestBody CreatePaymentRequest request) {
+            @Valid @RequestBody CreatePaymentRequest request) {
         try {
             User user = resolveUser(userDetails);
-            
+
             Address address = addressRepository.findById(request.getAddressId())
                     .orElseThrow(() -> new IllegalArgumentException("Adresse introuvable"));
 
@@ -69,28 +85,33 @@ public class PaymentController {
 
             // Créer la commande
             Order order = checkoutService.createOrder(user, address, request.getZone(), request.getPromoCode());
-            
+
+            // Valider le montant maximum Paydunya (limite sandbox: 3 000 000 FCFA)
+            BigDecimal maxAmount = new BigDecimal("3000000");
+            if (order.getTotalAmount().compareTo(maxAmount) > 0) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Le montant total de %.0f FCFA dépasse la limite maximale de Paydunya (3 000 000 FCFA en mode sandbox). Veuillez réduire la quantité des articles ou contacter le support.",
+                                order.getTotalAmount()));
+            }
+
             // Créer la facture Paydunya
             String description = "Commande #" + order.getOrderNumber() + " - PneuMali";
             PaydunyaInvoiceResponse invoiceResponse = paydunyaService.createInvoice(
                     order.getTotalAmount(),
-                    description
-            );
+                    description);
 
             if (invoiceResponse == null || invoiceResponse.getToken() == null) {
                 throw new RuntimeException("Échec de la création de la facture Paydunya");
             }
 
-            // Créer le paiement
+            // Créer le paiement (la relation Payment -> Order est déjà établie dans
+            // PaymentService)
             Payment payment = paymentService.createPayment(
                     order,
                     PaymentMethod.BANK_CARD, // Par défaut pour paiement en ligne
                     order.getTotalAmount(),
-                    invoiceResponse.getToken()
-            );
-
-            order.setPayment(payment);
-            orderRepository.save(order);
+                    invoiceResponse.getToken());
 
             // Construire l'URL de checkout
             String checkoutUrl = paydunyaProperties.getCheckoutBaseUrl() + "/" + invoiceResponse.getToken();
@@ -103,7 +124,8 @@ public class PaymentController {
                     .message("Facture créée avec succès")
                     .build();
 
-            log.info("Facture Paydunya créée pour la commande {} - Token: {}", order.getOrderNumber(), invoiceResponse.getToken());
+            log.info("Facture Paydunya créée pour la commande {} - Token: {}", order.getOrderNumber(),
+                    invoiceResponse.getToken());
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
@@ -116,8 +138,20 @@ public class PaymentController {
         }
     }
 
+    /**
+     * Endpoint optionnel pour SoftPay (tests uniquement).
+     * 
+     * ⚠️ FLUX STANDARD PAYDUNYA :
+     * 1. Créer la facture via /create → reçoit checkoutUrl
+     * 2. Rediriger l'utilisateur vers checkoutUrl (page PayDunya)
+     * 3. PayDunya gère le paiement et fait un callback IPN vers /callback/paydunya
+     * 
+     * Cet endpoint SoftPay est uniquement pour les tests avec compte fictif.
+     */
     @PostMapping("/make-payment")
-    @Operation(summary = "Effectuer un paiement SoftPay", description = "Effectue le paiement via Paydunya SoftPay avec les informations du compte de test")
+    @Operation(summary = "Effectuer un paiement SoftPay (optionnel - tests uniquement)", description = "Effectue le paiement via Paydunya SoftPay avec les informations du compte de test. "
+            +
+            "⚠️ Pour le flux standard, utilisez le checkoutUrl retourné par /create et laissez PayDunya gérer le paiement.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Paiement traité", content = @Content(mediaType = "application/json", schema = @Schema(implementation = PaydunyaPaymentResponse.class))),
             @ApiResponse(responseCode = "400", description = "Paramètres invalides", content = @Content(mediaType = "application/json")),
@@ -126,13 +160,28 @@ public class PaymentController {
     })
     @Transactional
     public ResponseEntity<?> makePayment(@AuthenticationPrincipal UserDetails userDetails,
-                                        @Valid @RequestBody PaydunyaPaymentRequest request) {
+            @Valid @RequestBody PaydunyaPaymentRequest request) {
         try {
             User user = resolveUser(userDetails);
 
             // Trouver le paiement par invoiceToken
-            Payment payment = paymentRepository.findByInvoiceToken(request.getInvoiceToken())
-                    .orElseThrow(() -> new IllegalArgumentException("Paiement introuvable pour ce token de facture"));
+            String invoiceToken = request.getInvoiceToken();
+            log.info("Requête de paiement reçue - invoiceToken: {}, email: {}, phone: {}",
+                    invoiceToken, request.getCustomerEmail(), request.getPhoneNumber());
+
+            if (invoiceToken == null || invoiceToken.isBlank()) {
+                log.error("invoiceToken est null ou vide dans la requête");
+                return ResponseEntity.badRequest()
+                        .body(Map.of("success", false, "message", "Token de facture manquant dans la requête"));
+            }
+
+            log.debug("Recherche du paiement avec invoiceToken: {}", invoiceToken);
+            Payment payment = paymentRepository.findByInvoiceToken(invoiceToken)
+                    .orElseThrow(() -> {
+                        log.warn("Paiement introuvable pour invoiceToken: {}", invoiceToken);
+                        return new IllegalArgumentException("Paiement introuvable pour ce token de facture");
+                    });
+            log.debug("Paiement trouvé: ID={}, invoiceToken={}", payment.getId(), payment.getInvoiceToken());
 
             Order order = payment.getOrder();
             if (order == null) {
@@ -151,23 +200,23 @@ public class PaymentController {
                         .body(Map.of("success", false, "message", "Accès non autorisé à cette commande"));
             }
 
-            // Effectuer le paiement via Paydunya
+            // Effectuer le paiement via Paydunya (Sandbox SoftPay)
             PaydunyaPaymentResponse paymentResponse = paydunyaService.makePayment(
                     request.getPhoneNumber(),
                     request.getCustomerEmail(),
                     request.getPassword(),
-                    request.getInvoiceToken()
-            );
+                    request.getInvoiceToken());
 
             // Mettre à jour le statut du paiement et de la commande
             if (paymentResponse.isSuccess()) {
                 paymentService.updatePaymentStatus(payment.getId(), PaymentStatus.SUCCESS, request.getInvoiceToken());
                 orderService.confirm(order);
                 orderRepository.save(order);
-                log.info("Paiement SoftPay réussi pour la commande {} - Token: {}", order.getOrderNumber(), request.getInvoiceToken());
+                log.info("Paiement SoftPay réussi pour la commande {} - Token: {}", order.getOrderNumber(),
+                        request.getInvoiceToken());
             } else {
                 paymentService.updatePaymentStatus(payment.getId(), PaymentStatus.FAILED, null);
-                log.warn("Paiement SoftPay échoué pour la commande {} - Token: {} - Message: {}", 
+                log.warn("Paiement SoftPay échoué pour la commande {} - Token: {} - Message: {}",
                         order.getOrderNumber(), request.getInvoiceToken(), paymentResponse.getMessage());
             }
 

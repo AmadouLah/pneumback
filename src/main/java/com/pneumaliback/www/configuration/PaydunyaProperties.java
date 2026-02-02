@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaydunyaProperties {
 
-    @Value("${paydunya.master-key:wQzk9ZwR-Qq9m-0hD0-zpud-je5coGC3FHKW}")
+    @Value("${paydunya.master-key:EKOJizcs-Pl9g-whnz-LXBM-F8wfmRIe75EF}")
     private String masterKey;
 
-    @Value("${paydunya.private-key:test_private_rMIdJM3PLLhLjyArx9tF3VURAF5}")
+    @Value("${paydunya.private-key:test_private_B01btqemoge0v95etwJsnUQQMUI}")
     private String privateKey;
 
-    @Value("${paydunya.token:IivOiOxGJuWhc5znlIiK}")
+    @Value("${paydunya.token:dixTP86ymNWYy2cgoRMJ}")
     private String token;
 
     @Value("${paydunya.api-base-url:https://app.paydunya.com/sandbox-api/v1}")
@@ -28,6 +28,9 @@ public class PaydunyaProperties {
 
     @Value("${paydunya.checkout-base-url:https://app.paydunya.com/sandbox-checkout/invoice}")
     private String checkoutBaseUrl;
+
+    @Value("${paydunya.callback-url:http://localhost:9999/api/payments/callback/paydunya}")
+    private String callbackUrl;
 
     @PostConstruct
     public void validate() {
@@ -56,5 +59,6 @@ public class PaydunyaProperties {
         } else {
             log.info("Token chargé correctement: {} chars", token.length());
         }
+        log.info("Callback URL configuré: {}", callbackUrl);
     }
 }

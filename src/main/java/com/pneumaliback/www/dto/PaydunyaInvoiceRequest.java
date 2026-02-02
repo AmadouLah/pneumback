@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 public class PaydunyaInvoiceRequest {
     private Invoice invoice;
     private Store store;
+    private Actions actions;
 
     @Data
     @Builder
@@ -24,5 +25,12 @@ public class PaydunyaInvoiceRequest {
     @Builder
     public static class Store {
         private String name;
+    }
+
+    @Data
+    @Builder
+    public static class Actions {
+        @JsonProperty("callback_url")
+        private String callbackUrl;
     }
 }

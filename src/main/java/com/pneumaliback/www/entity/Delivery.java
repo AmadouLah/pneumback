@@ -20,7 +20,7 @@ import lombok.EqualsAndHashCode;
         @Index(name = "idx_deliveries_zone", columnList = "zone")
 })
 @Data
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, exclude = {"order"})
 public class Delivery extends EntiteAuditable {
 
     @Enumerated(EnumType.STRING)

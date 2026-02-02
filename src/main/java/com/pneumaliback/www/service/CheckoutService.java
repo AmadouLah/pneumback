@@ -73,11 +73,12 @@ public class CheckoutService {
 
         // Sauvegarder l'Order une seule fois (les OrderItem et Delivery seront
         // persistés en cascade)
-        orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+        orderRepository.flush(); // Forcer le flush pour s'assurer que l'ID est disponible
 
         // Nettoyer le panier
         cartService.clear(user);
 
-        return order;
+        return savedOrder;
     }
 }

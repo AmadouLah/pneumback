@@ -7,14 +7,17 @@ import com.pneumaliback.www.entity.Order;
 import com.pneumaliback.www.repository.PaymentRepository;
 import com.pneumaliback.www.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -22,6 +25,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final OrderService orderService;
+    private final EntityManager entityManager;
 
     // Order chosen to prioritize user experience in Mali
     private static final List<PaymentMethod> ORDERED_METHODS = List.of(
@@ -53,14 +57,24 @@ public class PaymentService {
 
     @Transactional
     public Payment createPayment(Order order, PaymentMethod method, BigDecimal amount, String invoiceToken) {
+        // L'Order est déjà persisté et attaché à la session Hibernate dans la même
+        // transaction
+        // On utilise getReferenceById pour obtenir une référence gérée par Hibernate
+        Order attachedOrder = orderRepository.getReferenceById(order.getId());
+
         Payment payment = new Payment();
-        payment.setOrder(order);
+        payment.setOrder(attachedOrder);
         payment.setMethod(method);
         payment.setStatus(PaymentStatus.PENDING);
         payment.setAmount(amount);
         payment.setProvider("Paydunya");
         payment.setInvoiceToken(invoiceToken);
-        return paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+        // Forcer le flush pour que le paiement soit immédiatement visible dans d'autres
+        // transactions
+        entityManager.flush();
+        log.debug("Paiement créé avec invoiceToken: {}", savedPayment.getInvoiceToken());
+        return savedPayment;
     }
 
     @Transactional

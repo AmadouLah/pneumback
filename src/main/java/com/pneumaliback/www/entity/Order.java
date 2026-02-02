@@ -25,7 +25,7 @@ import lombok.EqualsAndHashCode;
         @Index(name = "idx_orders_promotion_id", columnList = "promotion_id")
 })
 @Data
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, exclude = { "delivery", "payment", "items" })
 public class Order extends EntiteAuditable {
 
     @Column(name = "order_number", unique = true, length = 32)

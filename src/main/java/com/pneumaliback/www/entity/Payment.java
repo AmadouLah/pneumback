@@ -20,7 +20,7 @@ import lombok.EqualsAndHashCode;
     @Index(name = "idx_payments_tx_ref", columnList = "transactionReference")
 })
 @Data
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, exclude = {"order"})
 public class Payment extends EntiteAuditable {
 
     @Enumerated(EnumType.STRING)
@@ -40,7 +40,7 @@ public class Payment extends EntiteAuditable {
     @Column(length = 100, unique = true)
     private String transactionReference;
 
-    @Column(length = 100)
+    @Column(name = "invoice_token", length = 100)
     private String invoiceToken;
 
     @OneToOne

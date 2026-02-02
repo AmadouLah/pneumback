@@ -45,6 +45,9 @@ public class PaydunyaService {
                 .store(PaydunyaInvoiceRequest.Store.builder()
                         .name(paydunyaProperties.getStoreName())
                         .build())
+                .actions(PaydunyaInvoiceRequest.Actions.builder()
+                        .callbackUrl(paydunyaProperties.getCallbackUrl())
+                        .build())
                 .build();
 
         HttpHeaders headers = createHeaders();
@@ -92,6 +95,13 @@ public class PaydunyaService {
                         : "Code de réponse invalide: " + invoiceResponse.getResponseCode();
                 log.error("Erreur Paydunya lors de la création de la facture: {} - {} - Réponse complète: {}",
                         invoiceResponse.getResponseCode(), errorMsg, responseBody);
+
+                // Transformer les erreurs spécifiques en IllegalArgumentException pour une
+                // meilleure gestion
+                if ("4003".equals(invoiceResponse.getResponseCode()) && errorMsg.contains("Maximum checkout amount")) {
+                    throw new IllegalArgumentException(errorMsg);
+                }
+
                 throw new RuntimeException("Erreur Paydunya: " + errorMsg);
             }
 
@@ -126,6 +136,8 @@ public class PaydunyaService {
 
     public PaydunyaPaymentResponse makePayment(String phoneNumber, String customerEmail, String password,
             String invoiceToken) {
+        // URL correcte pour Sandbox SoftPay selon la documentation officielle
+        // https://developers.paydunya.com/doc/FR/sandbox_softpay
         String url = paydunyaProperties.getApiBaseUrl() + "/softpay/checkout/make-payment";
 
         PaydunyaPaymentRequest request = PaydunyaPaymentRequest.builder()
@@ -139,7 +151,8 @@ public class PaydunyaService {
         HttpEntity<PaydunyaPaymentRequest> entity = new HttpEntity<>(request, headers);
 
         try {
-            log.debug("Tentative de paiement SoftPay pour la facture: {}", invoiceToken);
+            log.info("Tentative de paiement SoftPay - URL: {}, Facture: {}, Email: {}", url, invoiceToken,
+                    customerEmail);
             ResponseEntity<PaydunyaPaymentResponse> response = restTemplate.exchange(
                     url,
                     HttpMethod.POST,
@@ -160,17 +173,31 @@ public class PaydunyaService {
 
             return paymentResponse;
         } catch (HttpClientErrorException | HttpServerErrorException e) {
-            log.error("Erreur lors du paiement SoftPay: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Erreur lors du paiement SoftPay: {} - URL: {}", e.getStatusCode(), url);
+            String responseBody = e.getResponseBodyAsString();
+            if (responseBody != null && responseBody.length() > 500) {
+                log.error("Réponse Paydunya (tronquée): {}...", responseBody.substring(0, 500));
+            } else {
+                log.error("Réponse Paydunya: {}", responseBody);
+            }
 
-            // Essayer d'extraire le message d'erreur de la réponse
-            String errorMessage = "Erreur lors du paiement SoftPay";
-            try {
-                if (e.getResponseBodyAsString() != null && !e.getResponseBodyAsString().isEmpty()) {
-                    // On pourrait parser la réponse JSON ici si nécessaire
-                    errorMessage = "Erreur Paydunya: " + e.getResponseBodyAsString();
+            // Gérer spécifiquement l'erreur 404
+            String errorMessage;
+            if (e.getStatusCode().value() == 404) {
+                errorMessage = "L'endpoint SoftPay Paydunya n'est pas disponible. Veuillez vérifier que le service SoftPay est activé pour votre compte Paydunya ou contacter le support Paydunya.";
+                log.error("Endpoint SoftPay introuvable (404) - URL utilisée: {}", url);
+            } else {
+                errorMessage = "Erreur lors du paiement SoftPay";
+                try {
+                    if (responseBody != null && !responseBody.isEmpty() && !responseBody.contains("<!DOCTYPE")) {
+                        // Essayer de parser une réponse JSON si disponible
+                        errorMessage = "Erreur Paydunya: " + responseBody;
+                    } else if (responseBody != null && responseBody.contains("<!DOCTYPE")) {
+                        errorMessage = "L'endpoint Paydunya n'est pas disponible ou n'existe pas.";
+                    }
+                } catch (Exception ignored) {
+                    // Si on ne peut pas lire le body, utiliser le message par défaut
                 }
-            } catch (Exception ignored) {
-                // Si on ne peut pas lire le body, utiliser le message par défaut
             }
 
             PaydunyaPaymentResponse errorResponse = new PaydunyaPaymentResponse();
